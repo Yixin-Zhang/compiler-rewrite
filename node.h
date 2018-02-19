@@ -11,8 +11,8 @@ typedef std::vector<NStatement*> StatementList;
 typedef std::vector<NExpression*> ExpressionList;
 typedef std::vector<NVariableDeclaration*> VariableList;
 
-typedef std::vector<NExtern*> ExternList;
-typedef std::vector<NFunc*> FuncList;
+typedef std::vector<NExternDeclaration*> ExternList;
+typedef std::vector<NFunctionDeclaration*> FuncList;
 
 
 class Node {
@@ -125,17 +125,17 @@ public:
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
-class NExterns : NStatement {
+class NExterns : public NStatement {
 	ExternList externs;
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
-class NFuncs : NStatement {
+class NFuncs : public NStatement {
 	FuncList funcs;
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
-class NProgram : NStatement {
+class NProgram : public NStatement {
 public:
 	NExterns externs;
 	NFuncs funcs;

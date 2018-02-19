@@ -69,38 +69,38 @@
 
 %%
 
-program : stmts { programBlock = $1; }
+prog:
+    opt_externs funcs { $$ = new NProgram(); $$.externs = $1; $$.funcs = $2; programBlock = $$; }
     ;
 
-prog:
-    opt_exters funcs { root = kal_ast_prog_create($1, kal_ast_functions_create($2.count, $2.args)); }
-    ;
-opt_exters:
-       exters { $$ = kal_ast_exters_create($1.count, $1.args); }
-       | { $$ = kal_ast_exters_create(0, NULL); }
+opt_externs:
+       externs { $$ = $1; }
+       | { $$ = new NExterns(); }
        ;
-exters:
-        exters exter { ++$1.count; $1.args = (kal_ast_node**)realloc($1.args, sizeof(kal_ast_node*) * $1.count); $1.args[$1.count-1] = $2; $$ = $1; }
-        | exter { $$.count = 1; $$.args = (kal_ast_node**)malloc(sizeof(kal_ast_node*)); $$.args[0] = $1; }
+externs:
+        exters exter { $1.externs.push_back($2); $$ = $1; }
+        | exter { $$ = new NExterns(); $$.externs.push_back($1); }
         ;
 exter:
-      EXTERNSYM type globid LP opt_tdecls RP SEMICOLON { $$ = kal_ast_exter_create($2, $3, $5); }
+      EXTERNSYM type globid LP opt_tdecls RP SEMICOLON { $$ = new NExternDeclaration($2, $3, $5); }
       ;
 
 opt_tdecls:
           tdecls { $$ = kal_ast_tdecls_create($1.count, $1.args); }
           | { $$ = kal_ast_tdecls_create(0, NULL); }
           ;
+
 funcs:
-     funcs func { ++$1.count; $1.args = (kal_ast_node**)realloc($1.args, sizeof(kal_ast_node*) * $1.count); $1.args[$1.count-1] = $2; $$ = $1; }
-     | func { $$.count = 1; $$.args = (kal_ast_node**)malloc(sizeof(kal_ast_node*)); $$.args[0] = $1; }
+     funcs func { $1.funcs.push_back($2); $$ = $1; }
+     | func { $$ = new NFuncs(); $$.funcs.push_back($1); }
+
 func:
-    DEFSYM type globid LP opt_vdecls RP blk { $$ = kal_ast_function_create($2, $3, $5, $7); defined_function_names.insert($3);
-      for (auto a : used_function_names) { if (defined_function_names.find(a) == defined_function_names.end())
-        cout << "error: All functions must be declared and/or defined before they are used." << endl; }
-      used_function_names.clear();
-      var_type.clear();
-      globid_type[$3] = $2;
+    DEFSYM type globid LP opt_vdecls RP blk { $$ = new NFunctionDeclaration();
+      // for (auto a : used_function_names) { if (defined_function_names.find(a) == defined_function_names.end())
+      //   cout << "error: All functions must be declared and/or defined before they are used." << endl; }
+      // used_function_names.clear();
+      // var_type.clear();
+      // globid_type[$3] = $2;
     }
     ;
 opt_vdecls:
@@ -108,22 +108,22 @@ opt_vdecls:
          | { $$ = kal_ast_vdecls_create(0, NULL); }
          ;
 blk:
-   LB opt_stmts RB { $$ = kal_ast_blk_create($2); }
+   LB opt_stmts RB { $$ = $2; }
    ;
 opt_stmts:
-         stmts { $$ = kal_ast_stmts_create($1.count, $1.args); }
-       | { $$ = kal_ast_stmts_create(0, NULL); }
+         stmts { $$ = $1; }
+       | { $$ = new NBlock(); }
          ;
 stmts:
-     stmts stmt { ++$1.count; $1.args = (kal_ast_node**)realloc($1.args, sizeof(kal_ast_node*) * $1.count); $1.args[$1.count-1] = $2; $$ = $1; }
-     | stmt { $$.count = 1; $$.args = (kal_ast_node**)malloc(sizeof(kal_ast_node*)); $$.args[0] = $1; }
+     stmts stmt { $1.statements.push_back($2); $$ = $1; }
+     | stmt { $$ = new NBlock(); $$.statements.push_back($1); }
      ;
 stmt:
     blk { $$ = $1; }
-    | RETURNSYM SEMICOLON { $$ = kal_ast_return_create(NULL); }
-    | RETURNSYM exp SEMICOLON { $$ = kal_ast_return_create($2); }
-    | vdecl ASSIGN exp SEMICOLON { $$ = kal_ast_vdecl_assign_create($1, $3); }
-    | exp SEMICOLON { $$ = kal_ast_expr_create($1); }
+    | RETURNSYM SEMICOLON { $$ = new NReturnStatement(); }
+    | RETURNSYM exp SEMICOLON { $$ = new NReturnStatement($2); }
+    | vdecl ASSIGN exp SEMICOLON { $$ = new NAssignment($1, $3); }
+    | exp SEMICOLON { $$ = new NExpressionStatement($1); }
     | WHILESYM LP exp  RP stmt { $$ = kal_ast_while_create($3, $5); }
     | IFSYM LP exp RP stmt opt_else { $$ = kal_ast_if_expr_create($3, $5, $6); }
     | PRINTSYM exp SEMICOLON { $$ = kal_ast_print_create($2); }
