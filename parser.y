@@ -124,19 +124,20 @@ stmt:
     | RETURNSYM exp SEMICOLON { $$ = new NReturnStatement($2); }
     | vdecl ASSIGN exp SEMICOLON { $$ = new NAssignment($1, $3); }
     | exp SEMICOLON { $$ = new NExpressionStatement($1); }
-    | WHILESYM LP exp  RP stmt { $$ = kal_ast_while_create($3, $5); }
-    | IFSYM LP exp RP stmt opt_else { $$ = kal_ast_if_expr_create($3, $5, $6); }
-    | PRINTSYM exp SEMICOLON { $$ = kal_ast_print_create($2); }
-    | PRINTSYM slit SEMICOLON { $$ = kal_ast_print_slit_create($2); }
+    | WHILESYM LP exp  RP stmt { $$ = new NWhileStatement($3, $5); }
+    | IFSYM LP exp RP stmt opt_else { $$ = new NIfStatement($3, $5, $6); }
+    | PRINTSYM exp SEMICOLON { $$ = new NPrintExpressionStatement($2); }
+    | PRINTSYM slit SEMICOLON { $$ = NPrintSlitStatement($2); }
     ;
 opt_else:
       ELSESYM stmt { $$ = $2; }
-      | { $$ = NULL; }
+      | { $$ = new NStatement(); }
       ;
 exps:
-    exp { $$.count = 1; $$.args = (kal_ast_node**)malloc(sizeof(kal_ast_node*)); $$.args[0] = $1; }
-    |  exps COMMA exp { ++$1.count; $1.args = (kal_ast_node**)realloc($1.args, sizeof(kal_ast_node*) * $1.count); $1.args[$1.count-1] = $3; $$ = $1; }
+    exp { $$ = new NExpression }
+    |  exps COMMA exp {  }
     ;
+
 exp:
    LP exp RP { $$ = $2; }
    | binop { $$ = $1; }
@@ -156,20 +157,20 @@ opt_exps:
         ;
 
 binop:
-     exp TIMES exp { $$ = kal_ast_binary_expr_create(KAL_BINOP_MUL, $1, $3, type_inference($1)); }
-     |exp SLASH exp { $$ = kal_ast_binary_expr_create(KAL_BINOP_DIV, $1, $3, type_inference($1)); }
-     |exp PLUS exp { $$ = kal_ast_binary_expr_create(KAL_BINOP_PLUS, $1, $3, type_inference($1)); }
-     |exp MINUS exp { $$ = kal_ast_binary_expr_create(KAL_BINOP_MINUS, $1, $3, type_inference($1)); }
-     |exp EQL exp { $$ = kal_ast_binary_expr_create(KAL_BINOP_EQL, $1, $3, type_inference($1)); }
-     |exp LSS exp { $$ = kal_ast_binary_expr_create(KAL_BINOP_LSS, $1, $3, type_inference($1)); }
-     |exp GTR exp { $$ = kal_ast_binary_expr_create(KAL_BINOP_GTR, $1, $3, type_inference($1)); }
-     |exp AND exp { $$ = kal_ast_binary_expr_create(KAL_BINOP_AND, $1, $3, type_inference($1)); }
-     |exp OR exp { $$ = kal_ast_binary_expr_create(KAL_BINOP_OR, $1, $3, type_inference($1)); }
-     |exp ASSIGN exp { $$ = kal_ast_binary_expr_create(KAL_BINOP_ASSIGN, $1, $3, type_inference($1)); }
+     exp TIMES exp { $$ = new NBinaryOperator($1, $2, $3); }
+     |exp SLASH exp { $$ = new NBinaryOperator($1, $2, $3); }
+     |exp PLUS exp { $$ = new NBinaryOperator($1, $2, $3); }
+     |exp MINUS exp { $$ = new NBinaryOperator($1, $2, $3); }
+     |exp EQL exp { $$ = new NBinaryOperator($1, $2, $3); }
+     |exp LSS exp { $$ = new NBinaryOperator($1, $2, $3); }
+     |exp GTR exp { $$ = new NBinaryOperator($1, $2, $3); }
+     |exp AND exp { $$ = new NBinaryOperator($1, $2, $3); }
+     |exp OR exp { $$ = new NBinaryOperator($1, $2, $3); }
+     |exp ASSIGN exp { $$ = new NBinaryOperator($1, $2, $3); }
      ;
 uop:
-   NOT exp { $$ = kal_ast_uop_expr_create(KAL_UOP_NOT, $2, type_inference($2)); }
-   | MINUS exp %prec NEG { $$ = kal_ast_uop_expr_create(KAL_UOP_MINUS, $2, type_inference($2)); }
+   NOT exp { $$ = new NUnaryOperator($1, $2); }
+   | MINUS exp %prec NEG { $$ = new NUnaryOperator($1, $2); }
    ;
 lit:
     LITERAL { if (abs($1 - int($1)) < 0.000000000001)
