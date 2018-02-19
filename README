@@ -1,0 +1,12 @@
+Members:
+Weixiang Weng
+Yixin Zhang
+
+We used Bison & Flex to generate our parser and the environment is Mac OS X.
+
+To generate the parser, run "make kale".
+
+To use kale to parse your input, please run "./kale -emit-ast -o outputfile.txt inputfile.txt".
+In this example, test1.ek is a sample input for testing.
+
+To clear the files it generate, please run "make clean".
