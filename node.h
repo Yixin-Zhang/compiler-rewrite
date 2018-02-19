@@ -125,6 +125,22 @@ public:
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
+class NWhileStatement : public NStatement {
+
+};
+
+class NIfStatement : public NStatement {
+
+};
+
+class NPrintExpressionStatement : public NStatement {
+
+};
+
+class NPrintSlitStatement : public NStatement {
+	
+};
+
 class NExterns : public NStatement {
 	ExternList externs;
 	virtual llvm::Value* codeGen(CodeGenContext& context);
