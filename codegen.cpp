@@ -30,18 +30,6 @@ llvm::Value* NDouble::codeGen(CodeGenContext& context) {
 	return NULL;
 }
 
-llvm::Value* NVariableExpression::codeGen(CodeGenContext& context) {
-	return NULL;
-}
-
-llvm::Value* NFuncExpression::codeGen(CodeGenContext& context) {
-	return NULL;
-}
-
-llvm::Value* NAssignment::codeGen(CodeGenContext& context) {
-	return NULL;
-}
-
 llvm::Value* NBlock::codeGen(CodeGenContext& context) {
 	return NULL;
 }
