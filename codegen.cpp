@@ -86,6 +86,10 @@ llvm::Value* NExternDeclaration::codeGen(CodeGenContext& context) {
 	return NULL;
 }
 
+llvm::Value* NExpressionList::codeGen(CodeGenContext& context) {
+	return NULL;
+}
+
 llvm::Value* NExternList::codeGen(CodeGenContext& context) {
 	return NULL;
 }

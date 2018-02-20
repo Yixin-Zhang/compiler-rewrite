@@ -31,7 +31,7 @@ public:
 class NExpression : public Node {
 };
 
-class NStatement : public Node {
+class NStatement : public Node {		
 };
 
 class NIdentifier : public NExpression {
@@ -85,7 +85,7 @@ public:
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
-class NVariableExpression : public NExpression {
+class NVariableExpression : public NExpression {		// not found in .y
 public:
 	NVariable& var;
 	NVariableExpression(NVariable& var) : var(var) {}
@@ -93,7 +93,7 @@ public:
 };
 
 // This should be a function expression
-class NFuncExpression : public NExpression {
+class NFuncExpression : public NExpression {			// not found in .y
 public:
 	NIdentifier& id;
 	NExpression* exp;
@@ -101,7 +101,7 @@ public:
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
-class NAssignment : public NExpression {
+class NAssignment : public NExpression {			// not found in .y
 public:
 	NIdentifier& lhs;
 	NExpression* rhs;
@@ -137,7 +137,7 @@ public:
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
-class NExpressionStatement : public NBlock {
+class NExpressionStatement : public NBlock {			// not found in .y
 public:
 	NExpression* exp;
 	NExpressionStatement(NExpression* expression) : 
@@ -209,6 +209,15 @@ public:
     	TypeDeclList* input_tdecls) :
         type(type), globid(id), tdecls(input_tdecls) {}
     virtual llvm::Value* codeGen(CodeGenContext& context);
+};
+
+class NExpressionList : public NExpression {
+public:
+	ExpressionList exps;
+	NExpressionList() {
+		exps.clear();
+	}
+	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
 class NExternList : public NStatement {

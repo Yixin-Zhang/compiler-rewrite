@@ -26,6 +26,7 @@
   NProgram* program_type;
   NExternList* externlist_type;
   NFuncList* funclist_type;
+  NExpressionList* explist_type;
   NExternDeclaration* extern_type;
   NFunctionDeclaration* func_type;
   NIdentifier* ident_type;
@@ -75,7 +76,8 @@
 %type <funclist_type> funcs
 %type <extern_type> exter;
 %type <func_type> func;
-%type <expr> opt_exps exps exp lit binop uop
+%type <expr> exp lit binop uop
+%type <explist_type> opt_exps exps
 %type <stringlist_type> opt_tdecls tdecls
 %type <vardecls_type> opt_vdecls vdecls
 %type <vdecl_type> vdecl
@@ -93,7 +95,7 @@ prog:
 
 opt_externs:
        externs { $$ = $1; }
-       | { $$ = NULL; }
+       | { $$ = new NExternList(); }
        ;
 
 externs:
@@ -175,9 +177,14 @@ opt_else:
       | { $$ = new NBlock(); }
       ;
 
+opt_exps:
+        exps { $$ = $1; }
+        | { $$ = NULL; }
+        ;
+
 exps:
-    exps COMMA exp {  }
-    | exp { $$ = new NExpression }
+    exps COMMA exp { $1->exps.push_back($3); $$ = $1; }
+    | exp { $$ = new NExpressionList(); $$->exps.push_back($1);}
     ;
 
 exp:
@@ -186,13 +193,9 @@ exp:
    | uop { $$ = $1; }
    | lit { $$ = $1; }
    | var { $$ = $1; }
-   | globid LP opt_exps RP { $$ = $3; }  // this is probably wrong, fix it.
+   | globid LP opt_exps RP { $$ = $3; }
    ;
 
-opt_exps:
-        exps { $$ = $1; }  // Probably wrong.
-        | { $$ = new NExpression(); }
-        ;
 
 binop:
      exp TIMES exp { $$ = new NBinaryOperator($1, $2, $3); }
