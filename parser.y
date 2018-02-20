@@ -7,12 +7,17 @@
   // stuff from flex that bison needs to know about:
   extern "C" int yylex();
   extern "C" int yyparse();
+  extern "C" void yyerror(const char* s);
   extern "C" FILE *yyin;
+  extern int yylineno;
+  extern int yycolumn;
   void yyerror(const char *s) {
-    printf("Error: %s\n", s);
+    fprintf(stderr, "Error | Line: %d, Column: %d: %s\n", yylineno, yycolumn, s);
     exit(1);
   }
 %}
+
+%locations
 
 /* Represents the many different ways we can access our data */
 %union {
@@ -88,7 +93,7 @@ prog:
 
 opt_externs:
        externs { $$ = $1; }
-       | { $$ = new NExternList(); }
+       | { $$ = NULL; }
        ;
 
 externs:
@@ -133,7 +138,7 @@ vdecl:
 
 opt_tdecls:
           tdecls { $$ = $1; }
-          | { $$ = new std::vector<string*>(); }
+          | { $$ = NULL; }
           ;
 
 tdecls:
@@ -248,7 +253,7 @@ int main(int argc, char **argv) {
   bool emit_ast = false;
   string inputfile, outputfile;
   for (int i = 1; i < argc; ++i) {
-    if (string(argv[i]).compare(string("-emit_ast")) == 0) {
+    if (string(argv[i]).compare(string("-emit-ast")) == 0) {
       emit_ast = true;
       continue;
     }
@@ -267,6 +272,11 @@ int main(int argc, char **argv) {
     } else {
       inputfile = string(argv[1]);
     }
+  }
+
+  if (inputfile.empty()) {
+    cout << "Please specify an inputfile to parse." << endl;
+    exit(1);
   }
 
   FILE *input = fopen(inputfile.c_str(), "r");

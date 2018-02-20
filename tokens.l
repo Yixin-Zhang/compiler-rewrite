@@ -8,7 +8,15 @@
 
 #define SAVE_TOKEN  yylval.str = new std::string(yytext, yyleng)
 #define TOKEN(t)    (yylval.token = t)
+
+int yycolumn = 1;
+
+#define YY_USER_ACTION yylloc.first_line = yylloc.last_line = yylineno; \
+    yylloc.first_column = yycolumn; yylloc.last_column = yycolumn + yyleng - 1; \
+    yycolumn += yyleng;
 %}
+
+%option yylineno
 
 %%
 
@@ -26,7 +34,7 @@
 
 "("           {return TOKEN(LP);}
 ")"           {return TOKEN(RP);}
-");"           {return TOKEN(SEMICOLON);}
+";"           {return TOKEN(SEMICOLON);}
 "{"           {return TOKEN(LB);}
 "}"           {return TOKEN(RB);}
 ","           {return TOKEN(COMMA);}
