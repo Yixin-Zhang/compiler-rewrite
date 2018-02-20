@@ -85,30 +85,6 @@ public:
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
-class NVariableExpression : public NExpression {		// not found in .y
-public:
-	NVariable& var;
-	NVariableExpression(NVariable& var) : var(var) {}
-	virtual llvm::Value* codeGen(CodeGenContext& context);
-};
-
-// This should be a function expression
-class NFuncExpression : public NExpression {			// not found in .y
-public:
-	NIdentifier& id;
-	NExpression* exp;
-	NFuncExpression(NIdentifier& id, NExpression* exp) : id(id), exp(exp) {}
-	virtual llvm::Value* codeGen(CodeGenContext& context);
-};
-
-class NAssignment : public NExpression {			// not found in .y
-public:
-	NIdentifier& lhs;
-	NExpression* rhs;
-	NAssignment(NIdentifier& lhs, NExpression* rhs) : 
-		lhs(lhs), rhs(rhs) { }
-	virtual llvm::Value* codeGen(CodeGenContext& context);
-};
 
 class NBlock : public NExpression {
 public:
@@ -137,7 +113,7 @@ public:
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
-class NExpressionStatement : public NBlock {			// not found in .y
+class NExpressionStatement : public NBlock {		
 public:
 	NExpression* exp;
 	NExpressionStatement(NExpression* expression) : 
