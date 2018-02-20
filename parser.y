@@ -46,7 +46,7 @@
 %left TIMES SLASH
 %right NEG NOT
 
-%token <string> IDENTIFIER INTEGER DOUBLE STRING LITERAL
+%token <string> IDENTIFIER INTEGER DOUBLE STRING
 
 /* Define the type of node our nonterminal symbols represent.
    The types refer to the %union declaration above. Ex: when
@@ -55,11 +55,11 @@
  */
 
 %type <string> globid var ident slit type
-%type <node> prog exter func blk stmt opt_else exp binop uop lit vdecl opt_exters opt_vdecls opt_stmts opt_exps opt_tdecls
-%type <node> opt_externs externs
+%type <node> func blk stmt opt_else exp lit vdecl opt_exters opt_vdecls opt_stmts opt_exps opt_tdecls
 %type <block> funcs vdecls stmts exps
 %type <block> tdecls
-
+%type <stmt> prog opt_externs externs exter
+%type <expr> binop uop
 
 %%
 
@@ -138,17 +138,13 @@ exp:
    | binop { $$ = $1; }
    | uop { $$ = $1; }
    | lit { $$ = $1; }
-   | var { string s_temp = var_type[$1];
-           auto found = s_temp.find("ref ");
-           if (found != string::npos)
-             expr_type = (char *)s_temp.substr(found+4).c_str();
-           else expr_type = (char *)s_temp.c_str();
-           $$ = kal_ast_variable_create($1, expr_type); }
-   | globid LP opt_exps RP { expr_type = (char *)globid_type[$1].c_str(); $$ = kal_ast_call_create($1, $3, expr_type); used_function_names.insert($1); }
+   | var { $$ = $1; }
+   | globid LP opt_exps RP { $$ = $3; }  // this is probably wrong, fix it.
    ;
+
 opt_exps:
-        exps { $$ = kal_ast_exprs_create($1.count, $1.args); }
-        | { $$ = kal_ast_exprs_create(0, NULL); }
+        exps { $$ = $1; }  // Probably wrong.
+        | { $$ = new NExpression(); }
         ;
 
 binop:
@@ -167,15 +163,16 @@ uop:
    NOT exp { $$ = new NUnaryOperator($1, $2); }
    | MINUS exp %prec NEG { $$ = new NUnaryOperator($1, $2); }
    ;
+
 lit:
-    TINTEGER { $$ = ;}
-    | TDOUBLE { $$ = ;}
+    INTEGER { $$ = new std::string($1);}
+    | DOUBLE { $$ = new std::string($1);}
     ;
 slit:
     STRING { $$ = new std::string($1); }
     ;
 ident:
-    IDENTIFER { $$ = new std::string($1); }
+    IDENTIFIER { $$ = new std::string($1); }
     ;
 
 var:

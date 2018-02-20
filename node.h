@@ -58,6 +58,14 @@ public:
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
+class NUnaryOperator : public NExpression {
+public:
+	int op;
+	NExpression& rhs;
+	NUnaryOperator(int op, NExpression& rhs) : rhs(rhs), op(op) { }
+	virtual llvm::Value* codeGen(CodeGenContext& context);
+};
+
 class NAssignment : public NExpression {
 public:
 	NIdentifier& lhs;
@@ -138,7 +146,7 @@ class NPrintExpressionStatement : public NStatement {
 };
 
 class NPrintSlitStatement : public NStatement {
-	
+
 };
 
 class NExterns : public NStatement {
