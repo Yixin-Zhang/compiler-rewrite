@@ -2,10 +2,16 @@
   #include "node.h"
   #include <cstdio>
   #include <cstdlib>
-  NBlock *programBlock; /* the top level root node of our final AST */
+  NProgram* programBlock; /* the top level root node of our final AST */
 
-  extern int yylex();
-  void yyerror(const char *s) { std::printf("Error: %s\n", s);std::exit(1); }
+  // stuff from flex that bison needs to know about:
+  extern "C" int yylex();
+  extern "C" int yyparse();
+  extern "C" FILE *yyin;
+  void yyerror(const char *s) {
+    printf("Error: %s\n", s);
+    exit(1);
+  }
 %}
 
 /* Represents the many different ways we can access our data */
@@ -19,10 +25,11 @@
   NFunctionDeclaration* func_type;
   NIdentifier* ident_type;
   NVariable* var_type;
-  std::vector<string> stringlist_type;
-  std::vector<NVariableDeclaration*> vardecls_type;
+  std::vector<string*>* stringlist_type;
+  std::vector<NVariableDeclaration*>* vardecls_type;
+  NVariableDeclaration* vdecl_type;
 
-  std::string str;  // Save all literals as string
+  std::string* str;  // Save all literals as string
   int token;
 }
 
@@ -65,7 +72,8 @@
 %type <func_type> func;
 %type <expr> opt_exps exps exp lit binop uop
 %type <stringlist_type> opt_tdecls tdecls
-%type <vardecls_type> opt_vdecls vdecls vdecl
+%type <vardecls_type> opt_vdecls vdecls
+%type <vdecl_type> vdecl
 %type <ident_type> ident globid
 %type <var_type> var
 %type <str> type slit
@@ -75,7 +83,7 @@
 %%
 
 prog:
-    opt_externs funcs { $$ = new NProgram(); $$.externs = $1; $$.funcs = $2; programBlock = $$; }
+    opt_externs funcs { $$ = new NProgram($1, $2); programBlock = $$; }
     ;
 
 opt_externs:
@@ -84,21 +92,23 @@ opt_externs:
        ;
 
 externs:
-        externs exter { $1.externs.push_back($2); $$ = $1; }
-        | exter { $$ = new NExternList(); $$.externs.push_back($1); }
+        externs exter { $1->externs.push_back($2); $$ = $1; }
+        | exter { $$ = new NExternList(); $$->externs.push_back($1); }
         ;
 
 exter:
-      EXTERNSYM type globid LP opt_tdecls RP SEMICOLON { $$ = new NExternDeclaration($2, $3, $5); }
+      EXTERNSYM type globid LP opt_tdecls RP SEMICOLON {
+        $$ = new NExternDeclaration(*$2, $3, $5);
+      }
       ;
 
 funcs:
-     funcs func { $1.funcs.push_back($2); $$ = $1; }
-     | func { $$ = new NFuncList(); $$.funcs.push_back($1); }
+     funcs func { $1->funcs.push_back($2); $$ = $1; }
+     | func { $$ = new NFuncList(); $$->funcs.push_back($1); }
 
 func:
     DEFSYM type globid LP opt_vdecls RP blk {
-      $$ = new NFunctionDeclaration($2, *$3, *$5, *$7);
+      $$ = new NFunctionDeclaration(*$2, $3, $5, $7);
       // for (auto a : used_function_names) { if (defined_function_names.find(a) == defined_function_names.end())
       //   cout << "error: All functions must be declared and/or defined before they are used." << endl; }
       // used_function_names.clear();
@@ -109,26 +119,26 @@ func:
 
 opt_vdecls:
          vdecls { $$ = $1; }
-         | { $$ = std::vector<NVariableDeclaration*>(); }
+         | { $$ = new std::vector<NVariableDeclaration*>(); }
          ;
 
 vdecls:
-      vdecls COMMA vdecl { $$.push_back($1); }
-      | vdecl { $$ = std::vector<NVariableDeclaration*>{$1}; }
+      vdecls COMMA vdecl { $1->push_back($3); $$ = $1; }
+      | vdecl { $$ = new std::vector<NVariableDeclaration*>(); $$->push_back($1); }
       ;
 
 vdecl:
-      type var { $$ = new NVariableDeclaration($1, *$2); }
+      type var { $$ = new NVariableDeclaration(*$1, $2); }
       ;
 
 opt_tdecls:
           tdecls { $$ = $1; }
-          | { $$ = std::vector<string>(); }
+          | { $$ = new std::vector<string*>(); }
           ;
 
 tdecls:
-      tdecls COMMA type { $1.push_back($3); $$ = $1; }
-      | type { $$ = std::vector<string>(); $$.push_back($1); }
+      tdecls COMMA type { $1->push_back($3); $$ = $1; }
+      | type { $$ = new std::vector<string*>(); $$->push_back($1); }
       ;
 
 blk:
@@ -139,8 +149,8 @@ opt_stmts:
           | { $$ = new NBlock(); }
          ;
 stmts:
-     stmts stmt { $1.statements.push_back($2); $$ = $1; }
-     | stmt { $$ = new NBlock(); $$.statements.push_back($1); }
+     stmts stmt { $1->statements.push_back($2); $$ = $1; }
+     | stmt { $$ = new NBlock(); $$->statements.push_back($1); }
      ;
 
 stmt:
@@ -149,15 +159,15 @@ stmt:
     | RETURNSYM exp SEMICOLON { $$ = new NReturnStatement($2); }
     | vdecl ASSIGN exp SEMICOLON { $$ = new NAssignStatement($1, $3); }
     | exp SEMICOLON { $$ = new NExpressionStatement($1); }
-    | WHILESYM LP exp  RP stmt { $$ = new NWhileStatement($3, $5); }
+    | WHILESYM LP exp RP stmt { $$ = new NWhileStatement($3, $5); }
     | IFSYM LP exp RP stmt opt_else { $$ = new NIfStatement($3, $5, $6); }
     | PRINTSYM exp SEMICOLON { $$ = new NPrintExpressionStatement($2); }
-    | PRINTSYM slit SEMICOLON { $$ = NPrintSlitStatement($2); }
+    | PRINTSYM slit SEMICOLON { $$ = new NPrintSlitStatement(*$2); }
     ;
 
 opt_else:
       ELSESYM stmt { $$ = $2; }
-      | { $$ = new NStatement(); }
+      | { $$ = new NBlock(); }
       ;
 
 exps:
@@ -198,8 +208,8 @@ uop:
    ;
 
 lit:
-    INTEGER { $$ = new NInteger($1); }
-    | DOUBLE { $$ = new NDouble($1); }
+    INTEGER { $$ = new NInteger(*$1); }
+    | DOUBLE { $$ = new NDouble(*$1); }
     ;
 
 slit:
@@ -211,7 +221,7 @@ var:
    ;
 
 ident:
-    IDENTIFIER { $$ = new NIdentifier($1); }
+    IDENTIFIER { $$ = new NIdentifier(*$1); }
     ;
 
 globid:
@@ -219,19 +229,66 @@ globid:
       ;
 
 type:
-    INTTYPE { $$ = string("int"); }
-    | CINTTYPE { $$ = string("cint"); }
-    | FLOATTYPE { $$ = string("float"); }
-    | SFLOATTYPE { $$ = string("sfloat"); }
-    | VOIDTYPE { $$ = string("void"); }
-    | REFTYPE type { $$ = string(string("ref") + $2) };
-    | NOALIASTYPE REFTYPE type { $$ = string(string("noalias ref ") + $3)); }
+    INTTYPE { $$ = new string("int"); }
+    | CINTTYPE { $$ = new string("cint"); }
+    | FLOATTYPE { $$ = new string("float"); }
+    | SFLOATTYPE { $$ = new string("sfloat"); }
+    | VOIDTYPE { $$ = new string("void"); }
+    | REFTYPE type { $$ = new string(string("ref").append(*$2)); }
+    | NOALIASTYPE REFTYPE type { $$ = new string(string("noalias ref ").append(*$3)); }
     ;
 
 %%
 
+
+using namespace std;
+
 int main(int argc, char **argv) {
-  yyparse();
-  std::cout << programBlock << endl;
+  // By default DO NOT print AST tree to stdout uness --emit_ast is provided.
+  bool emit_ast = false;
+  string inputfile, outputfile;
+  for (int i = 1; i < argc; ++i) {
+    if (string(argv[i]).compare(string("-emit_ast")) == 0) {
+      emit_ast = true;
+      continue;
+    }
+    if (string(argv[i]).compare(string("-o")) == 0) {
+      if (i == argc - 1) {
+        cout << "Please specify output file after -o option!" << endl;
+        exit(1);
+      }
+      outputfile = string(argv[i + 1]);
+      i += 1;
+      continue;
+    }
+    // This should be the input file
+    if (!inputfile.empty()) {
+      cout << "Ignored redundant command line argument: " << string(argv[i]) << endl;
+    } else {
+      inputfile = string(argv[1]);
+    }
+  }
+
+  FILE *input = fopen(inputfile.c_str(), "r");
+  // make sure it's valid:
+  if (!input) {
+    cout << "Error while opening inputfile: " << inputfile << endl;
+    exit(1);
+  }
+
+  cout << "Parsing input ..." << endl;
+  yyin = input;
+  do {
+    yyparse();
+  } while (!feof(yyin));
+
+  if (!outputfile.empty()) {
+    cout << "Writing parsed AST tree to outputfile: " << outputfile << endl;
+    // YAML output
+  } else if (emit_ast) {
+    // YAML to stdout
+  }
+
+  cout << "Done." << endl;
   return 0;
 }

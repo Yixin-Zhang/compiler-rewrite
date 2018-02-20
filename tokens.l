@@ -6,7 +6,7 @@
 
 #define YY_DECL extern "C" int yylex()
 
-#define SAVE_TOKEN  yylval.string = new std::string(yytext, yyleng)
+#define SAVE_TOKEN  yylval.str = new std::string(yytext, yyleng)
 #define TOKEN(t)    (yylval.token = t)
 %}
 
