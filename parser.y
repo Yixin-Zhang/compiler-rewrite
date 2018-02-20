@@ -11,6 +11,7 @@
 /* Represents the many different ways we can access our data */
 %union {
   NBlock* block;
+  NExpression *expr;
   NProgram* program_type;
   NExternList* externlist_type;
   NFuncList* funclist_type;
@@ -30,15 +31,15 @@
    they represent.
  */
 
-%token TIMES SLASH PLUS MINUS
-%token ASSIGN
-%token EQL LSS GTR
-%token AND OR
-%token NOT
+%token <token> TIMES SLASH PLUS MINUS
+%token <token> ASSIGN
+%token <token> EQL LSS GTR
+%token <token> AND OR
+%token <token> NOT
 
-%token LP RP SEMICOLON LB RB COMMA DOLLOR
-%token EXTERNSYM DEFSYM RETURNSYM WHILESYM IFSYM PRINTSYM ELSESYM
-%token INTTYPE CINTTYPE FLOATTYPE SFLOATTYPE VOIDTYPE REFTYPE NOALIASTYPE
+%token <token> LP RP SEMICOLON LB RB COMMA DOLLOR
+%token <token> EXTERNSYM DEFSYM RETURNSYM WHILESYM IFSYM PRINTSYM ELSESYM
+%token <token> INTTYPE CINTTYPE FLOATTYPE SFLOATTYPE VOIDTYPE REFTYPE NOALIASTYPE
 
 %right ASSIGN
 %left OR
@@ -62,13 +63,14 @@
 %type <funclist_type> funcs
 %type <extern_type> exter;
 %type <func_type> func;
+%type <expr> opt_exps exps exp lit binop uop
 %type <stringlist_type> opt_tdecls tdecls
+%type <vardecls_type> opt_vdecls vdecls vdecl
 %type <ident_type> ident globid
 %type <var_type> var
-%type <vardecls_type> vdecls;
-%type <str> type
+%type <str> type slit
 
-%type <block> blk opt_stmts stmts
+%type <block> blk opt_stmts stmts stmt opt_else
 
 %%
 
@@ -129,7 +131,6 @@ tdecls:
       | type { $$ = std::vector<string>(); $$.push_back($1); }
       ;
 
-
 blk:
    LB opt_stmts RB { $$ = $2; }
    ;
@@ -180,16 +181,17 @@ opt_exps:
 
 binop:
      exp TIMES exp { $$ = new NBinaryOperator($1, $2, $3); }
-     |exp SLASH exp { $$ = new NBinaryOperator($1, $2, $3); }
-     |exp PLUS exp { $$ = new NBinaryOperator($1, $2, $3); }
-     |exp MINUS exp { $$ = new NBinaryOperator($1, $2, $3); }
-     |exp EQL exp { $$ = new NBinaryOperator($1, $2, $3); }
-     |exp LSS exp { $$ = new NBinaryOperator($1, $2, $3); }
-     |exp GTR exp { $$ = new NBinaryOperator($1, $2, $3); }
-     |exp AND exp { $$ = new NBinaryOperator($1, $2, $3); }
-     |exp OR exp { $$ = new NBinaryOperator($1, $2, $3); }
-     |exp ASSIGN exp { $$ = new NBinaryOperator($1, $2, $3); }
+     | exp SLASH exp { $$ = new NBinaryOperator($1, $2, $3); }
+     | exp PLUS exp { $$ = new NBinaryOperator($1, $2, $3); }
+     | exp MINUS exp { $$ = new NBinaryOperator($1, $2, $3); }
+     | exp EQL exp { $$ = new NBinaryOperator($1, $2, $3); }
+     | exp LSS exp { $$ = new NBinaryOperator($1, $2, $3); }
+     | exp GTR exp { $$ = new NBinaryOperator($1, $2, $3); }
+     | exp AND exp { $$ = new NBinaryOperator($1, $2, $3); }
+     | exp OR exp { $$ = new NBinaryOperator($1, $2, $3); }
+     | exp ASSIGN exp { $$ = new NBinaryOperator($1, $2, $3); }
      ;
+
 uop:
    NOT exp { $$ = new NUnaryOperator($1, $2); }
    | MINUS exp %prec NEG { $$ = new NUnaryOperator($1, $2); }
@@ -204,13 +206,13 @@ slit:
     STRING { $$ = $1; }
     ;
 
-ident:
-    IDENTIFIER { $$ = new NIdentifier($1); }
-    ;
-
 var:
    DOLLOR ident { $$ = new NVariable(*$2); }
    ;
+
+ident:
+    IDENTIFIER { $$ = new NIdentifier($1); }
+    ;
 
 globid:
       ident { $$ = $1; }
