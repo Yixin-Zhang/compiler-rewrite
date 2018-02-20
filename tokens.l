@@ -48,12 +48,12 @@
 "noalias"     {return TOKEN(NOALIASTYPE);}
 
 
-#[^\n]*\n  		 ;  // Comments
-[ \t\n]          ;  // Spaces
+#[^\n]*\n  		 ;  // Ignore comments
+[ \t\n]          ;  // Ignore spaces
+[0-9]+					    {SAVE_TOKEN; return INTEGER;}
 [0-9]+\.[0-9]* 			    {SAVE_TOKEN; return DOUBLE;}
-[0-9]+					        {SAVE_TOKEN; return INTEGER;}
-[a-zA-Z_][a-zA-Z0-9_]*  {SAVE_TOKEN; return IDENTIFIER;}
-\"[^"]*\"         {SAVE_TOKEN; return STRING;}
+[a-zA-Z_][a-zA-Z0-9_]*  	{SAVE_TOKEN; return IDENTIFIER;}
+\"[^"]*\"         			{SAVE_TOKEN; return STRING;}
 .                ;
 %%
 

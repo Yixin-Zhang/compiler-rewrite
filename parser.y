@@ -10,15 +10,18 @@
 
 /* Represents the many different ways we can access our data */
 %union {
-  Node *node;
-  NBlock *block;
-  NExpression *expr;
-  NStatement *stmt;
-  NIdentifier *ident;
-  NVariableDeclaration *var_decl;
-  std::vector<NVariableDeclaration*> *varvec;
-  std::vector<NExpression*> *exprvec;
-  std::string *string;  // Save all literals as string
+  NBlock* block;
+  NProgram* program_type;
+  NExternList* externlist_type;
+  NFuncList* funclist_type;
+  NExternDeclaration* extern_type;
+  NFunctionDeclaration* func_type;
+  NIdentifier* ident_type;
+  NVariable* var_type;
+  std::vector<string> stringlist_type;
+  std::vector<NVariableDeclaration*> vardecls_type;
+
+  std::string str;  // Save all literals as string
   int token;
 }
 
@@ -46,7 +49,7 @@
 %left TIMES SLASH
 %right NEG NOT
 
-%token <string> IDENTIFIER INTEGER DOUBLE STRING
+%token <str> IDENTIFIER INTEGER DOUBLE STRING
 
 /* Define the type of node our nonterminal symbols represent.
    The types refer to the %union declaration above. Ex: when
@@ -54,15 +57,20 @@
    calling an (NIdentifier*). It makes the compiler happy.
  */
 
-%type <string> globid var ident slit type
-%type <node> func blk stmt opt_else exp lit vdecl opt_exters opt_vdecls opt_stmts opt_exps opt_tdecls
-%type <block> funcs vdecls stmts exps
-%type <block> tdecls
-%type <stmt> prog opt_externs externs exter
-%type <expr> binop uop
+%type <program_type> prog
+%type <externlist_type> opt_externs externs
+%type <funclist_type> funcs
+%type <extern_type> exter;
+%type <func_type> func;
+%type <stringlist_type> opt_tdecls tdecls
+%type <ident_type> ident globid
+%type <var_type> var
+%type <vardecls_type> vdecls;
+%type <str> type
+
+%type <block> blk opt_stmts stmts
 
 %%
-
 
 prog:
     opt_externs funcs { $$ = new NProgram(); $$.externs = $1; $$.funcs = $2; programBlock = $$; }
@@ -70,27 +78,25 @@ prog:
 
 opt_externs:
        externs { $$ = $1; }
-       | { $$ = new NExterns(); }
+       | { $$ = new NExternList(); }
        ;
+
 externs:
         externs exter { $1.externs.push_back($2); $$ = $1; }
-        | exter { $$ = new NExterns(); $$.externs.push_back($1); }
+        | exter { $$ = new NExternList(); $$.externs.push_back($1); }
         ;
+
 exter:
       EXTERNSYM type globid LP opt_tdecls RP SEMICOLON { $$ = new NExternDeclaration($2, $3, $5); }
       ;
 
-opt_tdecls:
-          tdecls { $$ = kal_ast_tdecls_create($1.count, $1.args); }
-          | { $$ = kal_ast_tdecls_create(0, NULL); }
-          ;
-
 funcs:
      funcs func { $1.funcs.push_back($2); $$ = $1; }
-     | func { $$ = new NFuncs(); $$.funcs.push_back($1); }
+     | func { $$ = new NFuncList(); $$.funcs.push_back($1); }
 
 func:
-    DEFSYM type globid LP opt_vdecls RP blk { $$ = new NFunctionDeclaration();
+    DEFSYM type globid LP opt_vdecls RP blk {
+      $$ = new NFunctionDeclaration($2, *$3, *$5, *$7);
       // for (auto a : used_function_names) { if (defined_function_names.find(a) == defined_function_names.end())
       //   cout << "error: All functions must be declared and/or defined before they are used." << endl; }
       // used_function_names.clear();
@@ -98,39 +104,64 @@ func:
       // globid_type[$3] = $2;
     }
     ;
+
 opt_vdecls:
-         vdecls { $$ = kal_ast_vdecls_create($1.count, $1.args); }
-         | { $$ = kal_ast_vdecls_create(0, NULL); }
+         vdecls { $$ = $1; }
+         | { $$ = std::vector<NVariableDeclaration*>(); }
          ;
+
+vdecls:
+      vdecls COMMA vdecl { $$.push_back($1); }
+      | vdecl { $$ = std::vector<NVariableDeclaration*>{$1}; }
+      ;
+
+vdecl:
+      type var { $$ = new NVariableDeclaration($1, *$2); }
+      ;
+
+opt_tdecls:
+          tdecls { $$ = $1; }
+          | { $$ = std::vector<string>(); }
+          ;
+
+tdecls:
+      tdecls COMMA type { $1.push_back($3); $$ = $1; }
+      | type { $$ = std::vector<string>(); $$.push_back($1); }
+      ;
+
+
 blk:
    LB opt_stmts RB { $$ = $2; }
    ;
 opt_stmts:
-         stmts { $$ = $1; }
-       | { $$ = new NBlock(); }
+          stmts { $$ = $1; }
+          | { $$ = new NBlock(); }
          ;
 stmts:
      stmts stmt { $1.statements.push_back($2); $$ = $1; }
      | stmt { $$ = new NBlock(); $$.statements.push_back($1); }
      ;
+
 stmt:
     blk { $$ = $1; }
     | RETURNSYM SEMICOLON { $$ = new NReturnStatement(); }
     | RETURNSYM exp SEMICOLON { $$ = new NReturnStatement($2); }
-    | vdecl ASSIGN exp SEMICOLON { $$ = new NAssignment($1, $3); }
+    | vdecl ASSIGN exp SEMICOLON { $$ = new NAssignStatement($1, $3); }
     | exp SEMICOLON { $$ = new NExpressionStatement($1); }
     | WHILESYM LP exp  RP stmt { $$ = new NWhileStatement($3, $5); }
     | IFSYM LP exp RP stmt opt_else { $$ = new NIfStatement($3, $5, $6); }
     | PRINTSYM exp SEMICOLON { $$ = new NPrintExpressionStatement($2); }
     | PRINTSYM slit SEMICOLON { $$ = NPrintSlitStatement($2); }
     ;
+
 opt_else:
       ELSESYM stmt { $$ = $2; }
       | { $$ = new NStatement(); }
       ;
+
 exps:
-    exp { $$ = new NExpression }
-    |  exps COMMA exp {  }
+    exps COMMA exp {  }
+    | exp { $$ = new NExpression }
     ;
 
 exp:
@@ -165,44 +196,36 @@ uop:
    ;
 
 lit:
-    INTEGER { $$ = new std::string($1);}
-    | DOUBLE { $$ = new std::string($1);}
+    INTEGER { $$ = new NInteger($1); }
+    | DOUBLE { $$ = new NDouble($1); }
     ;
+
 slit:
-    STRING { $$ = new std::string($1); }
+    STRING { $$ = $1; }
     ;
+
 ident:
-    IDENTIFIER { $$ = new std::string($1); }
+    IDENTIFIER { $$ = new NIdentifier($1); }
     ;
 
 var:
-   DOLLOR ident { $$ = new string($2); }
+   DOLLOR ident { $$ = new NVariable(*$2); }
    ;
+
 globid:
-      ident { $$ = new string($1); }
+      ident { $$ = $1; }
       ;
+
 type:
-    INTTYPE { $$ = new string("int"); }
-    | CINTTYPE { $$ = new string("cint"); }
-    | FLOATTYPE { $$ = new string("float"); }
-    | SFLOATTYPE { $$ = new string("sfloat"); }
-    | VOIDTYPE { $$ = new string("void"); }
-    | REFTYPE type { $$ = new string(strcat(strdup("ref "), $2));
-      if (strcmp($2, "void") == 0 || strstr($2, "ref")) cout << "error: In <200b>ref <200b><type><200b>, the type may not be void or itself a reference type." << endl;}
-    | NOALIASTYPE REFTYPE type { $$ = new string(strcat(strdup("noalias ref "), $3)); }
+    INTTYPE { $$ = string("int"); }
+    | CINTTYPE { $$ = string("cint"); }
+    | FLOATTYPE { $$ = string("float"); }
+    | SFLOATTYPE { $$ = string("sfloat"); }
+    | VOIDTYPE { $$ = string("void"); }
+    | REFTYPE type { $$ = string(string("ref") + $2) };
+    | NOALIASTYPE REFTYPE type { $$ = string(string("noalias ref ") + $3)); }
     ;
-vdecls:
-      vdecl { $$.count = 1; $$.args = (kal_ast_node**)malloc(sizeof(kal_ast_node*)); $$.args[0] = $1; }
-      | vdecls COMMA vdecl { ++$1.count; $1.args = (kal_ast_node**)realloc($1.args, sizeof(kal_ast_node*) * $1.count); $1.args[$1.count-1] = $3; $$ = $1; }
-      ;
-tdecls:
-      type { $$.count = 1; $$.args = (char**)malloc(sizeof(char*)); $$.args[0] = $1; }
-      | tdecls COMMA type { ++$1.count; $1.args = (char**)realloc($1.args, sizeof(char*) * $1.count); $1.args[$1.count-1] = strdup($3); $$ = $1; }
-      ;
-vdecl:
-      type var { $$ = kal_ast_vdecl_create($1, $2); if (strstr($1, "ref")) ++ref_varibles[$2];
-                var_type[$2] = $1;}
-      ;
+
 %%
 
 int main(int argc, char **argv) {
