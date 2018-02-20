@@ -13,6 +13,7 @@ all: parser
 
 OBJS = parser.o  \
        tokens.o  \
+       codegen.o
 
 CPPFLAGS=-std=c++11 -Wno-deprecated-register
 LDFLAGS=-ll
