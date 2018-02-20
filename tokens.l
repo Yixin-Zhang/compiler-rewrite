@@ -50,9 +50,9 @@
 
 #[^\n]*\n  		 ;  // Comments
 [ \t\n]          ;  // Spaces
-[0-9]+\.[0-9]* 			    {SAVE_TOKEN; return TDOUBLE;}
-[0-9]+					        {SAVE_TOKEN; return TINTEGER;}
-[a-zA-Z_][a-zA-Z0-9_]*  {SAVE_TOKEN; return TIDENTIFIER;}
+[0-9]+\.[0-9]* 			    {SAVE_TOKEN; return DOUBLE;}
+[0-9]+					        {SAVE_TOKEN; return INTEGER;}
+[a-zA-Z_][a-zA-Z0-9_]*  {SAVE_TOKEN; return IDENTIFIER;}
 \"[^"]*\"         {SAVE_TOKEN; return STRING;}
 .                ;
 %%

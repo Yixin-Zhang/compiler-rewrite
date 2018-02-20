@@ -46,28 +46,23 @@
 %left TIMES SLASH
 %right NEG NOT
 
-%token <string> TIDENTIFIER TINTEGER TDOUBLE STRING
+%token <string> IDENTIFIER INTEGER DOUBLE STRING LITERAL
 
 /* Define the type of node our nonterminal symbols represent.
    The types refer to the %union declaration above. Ex: when
    we call an ident (defined by union type ident) we are really
    calling an (NIdentifier*). It makes the compiler happy.
  */
-%type <ident> ident
-%type <expr> numeric expr 
-%type <varvec> func_decl_args
-%type <exprvec> call_args
-%type <block> program stmts block
-%type <stmt> stmt var_decl func_decl extern_decl
-%type <token> comparison
 
-/* Operator precedence for mathematical operators */
-%left TPLUS TMINUS
-%left TMUL TDIV
+%type <string> globid var ident slit type
+%type <node> prog exter func blk stmt opt_else exp binop uop lit vdecl opt_exters opt_vdecls opt_stmts opt_exps opt_tdecls
+%type <node> opt_externs externs
+%type <block> funcs vdecls stmts exps
+%type <block> tdecls
 
-%start program
 
 %%
+
 
 prog:
     opt_externs funcs { $$ = new NProgram(); $$.externs = $1; $$.funcs = $2; programBlock = $$; }
@@ -78,7 +73,7 @@ opt_externs:
        | { $$ = new NExterns(); }
        ;
 externs:
-        exters exter { $1.externs.push_back($2); $$ = $1; }
+        externs exter { $1.externs.push_back($2); $$ = $1; }
         | exter { $$ = new NExterns(); $$.externs.push_back($1); }
         ;
 exter:
@@ -173,33 +168,31 @@ uop:
    | MINUS exp %prec NEG { $$ = new NUnaryOperator($1, $2); }
    ;
 lit:
-    LITERAL { if (abs($1 - int($1)) < 0.000000000001)
-                expr_type = strdup("int");
-              else expr_type = strdup("float");
-              $$ = kal_ast_number_create($1, expr_type); }
+    TINTEGER { $$ = ;}
+    | TDOUBLE { $$ = ;}
     ;
 slit:
-    STRING { $$ = strdup($1); }
+    STRING { $$ = new std::string($1); }
     ;
 ident:
-    IDENTIFER { $$ = strdup($1); }
+    IDENTIFER { $$ = new std::string($1); }
     ;
 
 var:
-   DOLLOR ident { $$ = strdup($2); }
+   DOLLOR ident { $$ = new string($2); }
    ;
 globid:
-      ident { $$ = strdup($1); }
+      ident { $$ = new string($1); }
       ;
 type:
-    INTTYPE { $$ = strdup("int"); }
-    | CINTTYPE { $$ = strdup("cint"); }
-    | FLOATTYPE { $$ = strdup("float"); }
-    | SFLOATTYPE { $$ = strdup("sfloat"); }
-    | VOIDTYPE { $$ = strdup("void"); }
-    | REFTYPE type { $$ = strdup(strcat(strdup("ref "), $2));
+    INTTYPE { $$ = new string("int"); }
+    | CINTTYPE { $$ = new string("cint"); }
+    | FLOATTYPE { $$ = new string("float"); }
+    | SFLOATTYPE { $$ = new string("sfloat"); }
+    | VOIDTYPE { $$ = new string("void"); }
+    | REFTYPE type { $$ = new string(strcat(strdup("ref "), $2));
       if (strcmp($2, "void") == 0 || strstr($2, "ref")) cout << "error: In <200b>ref <200b><type><200b>, the type may not be void or itself a reference type." << endl;}
-    | NOALIASTYPE REFTYPE type { $$ = strdup(strcat(strdup("noalias ref "), $3)); }
+    | NOALIASTYPE REFTYPE type { $$ = new string(strcat(strdup("noalias ref "), $3)); }
     ;
 vdecls:
       vdecl { $$.count = 1; $$.args = (kal_ast_node**)malloc(sizeof(kal_ast_node*)); $$.args[0] = $1; }
@@ -214,3 +207,9 @@ vdecl:
                 var_type[$2] = $1;}
       ;
 %%
+
+int main(int argc, char **argv) {
+  yyparse();
+  std::cout << programBlock << endl;
+  return 0;
+}
