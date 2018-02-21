@@ -24,7 +24,7 @@ LIBS = `$(LLVMCONFIG) --libs`
 INCLUDES=-I$(LLVMPATH)/include
 
 clean:
-	rm -rf parser.cpp parser.hpp parser tokens.cpp $(OBJS)
+	rm -rf parser parser.cpp parser.hpp tokens.cpp $(OBJS)
 
 parser.cpp: parser.y
 	bison -d -o $@ $^
@@ -40,5 +40,6 @@ tokens.cpp: tokens.l parser.hpp
 parser: $(OBJS)
 	g++ -o $@ $(OBJS) $(LIBS) $(LDFLAGS) $(CPPFLAGS) $(INCLUDES)
 
-test: parser example.txt
-	./parser example.txt -emit_ast
+test: parser test1.ek
+	./parser test1.ek -emit-ast
+

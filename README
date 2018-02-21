@@ -1,12 +1,17 @@
 Members:
-Weixiang Weng
-Yixin Zhang
+ - Weixiang Weng
+ - Yixin Zhang
 
 We used Bison & Flex to generate our parser and the environment is Mac OS X.
 
-To generate the parser, run "make kale".
+To generate the parser, simply run 'make' or 'make parser'.
 
-To use kale to parse your input, please run "./kale -emit-ast -o outputfile.txt inputfile.txt".
-In this example, test1.ek is a sample input for testing.
+To use the parser to parse your source file, run:
+./parser source-file [ -o outputfile] [-emit-ast]
 
-To clear the files it generate, please run "make clean".
+When -o option is used, the AST will be output to 'outputfile' in YAML format.
+When only -emit-ast option is used, AST will be printed to standard output.
+If not options specified, the parser will silently parse the source and check
+any syntax errors, and won't print the output.
+
+Run "make clean" to clean up the intermediate files generated.
