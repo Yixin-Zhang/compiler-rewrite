@@ -1,4 +1,8 @@
+#ifndef NODE_H_
+#define NODE_H_
+
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include "llvm/IR/Value.h"
 
@@ -22,10 +26,29 @@ typedef std::vector<string*> TypeDeclList;
 typedef std::vector<NVariableDeclaration*> VarDeclList;
 typedef std::vector<char> v;
 
+
+enum OPS {
+	// binops
+	OP_TIMES,
+	OP_DIV,
+	OP_PLUS,
+	OP_MINUS,
+	OP_EQL,
+	OP_LSS,
+	OP_GTR,
+	OP_AND,
+	OP_OR,
+	OP_ASSIGN,
+
+	// uops
+	OP_NOT
+};
+
 class Node {
 public:
 	virtual ~Node() {}
 	virtual llvm::Value* codeGen(CodeGenContext& context) { return NULL; }
+	virtual void yaml_output(ostream& os, int indent = 0) { return; }
 };
 
 class NExpression : public Node {
@@ -36,9 +59,10 @@ class NStatement : public Node {
 
 class NIdentifier : public NExpression {
 public:
-	std::string name_;
-	NIdentifier(const std::string& name) : name_(name) { }
+	std::string name;
+	NIdentifier(const std::string& name) : name(name) { }
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
 
@@ -47,6 +71,7 @@ public:
 	const NIdentifier& name;
 	NVariable(const NIdentifier& ident_name) : name(ident_name) {}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
 class NBinaryOperator : public NExpression {
@@ -57,6 +82,7 @@ public:
 	NBinaryOperator(NExpression* lhs, int op, NExpression* rhs) :
 		lhs(lhs), rhs(rhs), op(op) {}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
 class NUnaryOperator : public NExpression {
@@ -65,6 +91,7 @@ public:
 	NExpression* rhs;
 	NUnaryOperator(int op, NExpression* rhs) : rhs(rhs), op(op) { }
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
 class NInteger : public NExpression {
@@ -74,6 +101,7 @@ public:
 		value = stol(str);
 	}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
 class NDouble : public NExpression {
@@ -83,8 +111,18 @@ public:
 		value = stod(str);
 	}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
+class NFuncCall : public NExpression {
+public:
+	NIdentifier* funcname;
+	ExpressionList* exps;
+	NFuncCall(NIdentifier* funcname, ExpressionList* exps) :
+		funcname(funcname), exps(exps) {}
+	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
+};
 
 class NBlock : public NExpression {
 public:
@@ -93,6 +131,7 @@ public:
 		statements.clear();
 	}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
 class NReturnStatement : public NBlock {
@@ -102,6 +141,7 @@ public:
 	NReturnStatement() : exp(NULL) {}
 
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
 class NAssignStatement : public NBlock {
@@ -111,6 +151,7 @@ public:
 	NAssignStatement(NVariableDeclaration* vdecl, NExpression* exp) :
 		vdecl(vdecl), exp(exp) {}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
 class NExpressionStatement : public NBlock {		
@@ -119,8 +160,8 @@ public:
 	NExpressionStatement(NExpression* expression) : 
 		exp(expression) {}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
-
 
 class NWhileStatement : public NBlock {
 public:
@@ -129,6 +170,7 @@ public:
 	NWhileStatement(NExpression* exp, NBlock* stmt) :
 		exp(exp), stmt(stmt) {}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
 class NIfStatement : public NBlock {
@@ -139,6 +181,7 @@ public:
 	NIfStatement(NExpression* exp, NBlock* stmt, NBlock* else_stmt) :
 		exp(exp), stmt(stmt), else_stmt(else_stmt) {}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
 class NPrintExpressionStatement : public NBlock {
@@ -146,6 +189,7 @@ public:
 	NExpression* exp;
 	NPrintExpressionStatement(NExpression* exp) : exp(exp) {}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
 class NPrintSlitStatement : public NBlock {
@@ -153,6 +197,7 @@ public:
 	const string slit;
 	NPrintSlitStatement(const string& str) : slit(str) {}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
 class NVariableDeclaration : public NStatement {
@@ -162,18 +207,20 @@ public:
 	NVariableDeclaration(const string& type, const NVariable* var) :
 		type(type), var(var) {}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
 class NFunctionDeclaration : public NBlock {
 public:
 	const string& type;
-	const NIdentifier* name;
+	const NIdentifier* globid;
 	VarDeclList* vdecls;
 	NBlock* block;
 	NFunctionDeclaration(const string& type, const NIdentifier* name, 
 			VarDeclList* vdecls, NBlock* block) :
-		type(type), name(name), vdecls(vdecls), block(block) {}
+		type(type), globid(name), vdecls(vdecls), block(block) {}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
 class NExternDeclaration : public NStatement {
@@ -185,6 +232,7 @@ public:
     	TypeDeclList* input_tdecls) :
         type(type), globid(id), tdecls(input_tdecls) {}
     virtual llvm::Value* codeGen(CodeGenContext& context);
+    virtual void yaml_output(ostream& os, int indent = 0);
 };
 
 class NExpressionList : public NExpression {
@@ -194,6 +242,7 @@ public:
 		exps.clear();
 	}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
 class NExternList : public NStatement {
@@ -203,6 +252,7 @@ public:
 		externs.clear();
 	}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
 class NFuncList : public NStatement {
@@ -212,6 +262,7 @@ public:
 		funcs.clear();
 	}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
 
@@ -222,4 +273,7 @@ public:
 	NProgram(NExternList* externs, NFuncList* funcs) :
 		externs(externs), funcs(funcs) {}
 	virtual llvm::Value* codeGen(CodeGenContext& context);	
+	virtual void yaml_output(ostream& os, int indent = 0);
 };
+
+#endif

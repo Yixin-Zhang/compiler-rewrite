@@ -9,15 +9,20 @@ all: parser
 # LLVMCONFIG = llvm-config
 # CPPFLAGS = `$(LLVMCONFIG) --cppflags` -std=c++11
 # LDFLAGS = `$(LLVMCONFIG) --ldflags` -lpthread -ldl -lz -lncurses -rdynamic
-# LIBS = `$(LLVMCONFIG) --libs`
 
 OBJS = parser.o  \
        tokens.o  \
-       codegen.o
+       codegen.o \
+       yaml.o
 
-CPPFLAGS=-std=c++11 -Wno-deprecated-register
-LDFLAGS=-ll
-INCLUDES=-I/Users/yixin/llvm/include
+LLVMPATH=/Users/yixin/llvm
+LLVMCONFIG =$(LLVMPATH)/bin/llvm-config
+
+CPPFLAGS=-std=c++11 -Wno-deprecated-register `$(LLVMCONFIG) --cppflags`
+LDFLAGS=-ll `$(LLVMCONFIG) --ldflags` -lpthread -ldl -lz -lncurses -rdynamic
+LIBS = `$(LLVMCONFIG) --libs`
+INCLUDES=-I$(LLVMPATH)/include
+
 clean:
 	rm -rf parser.cpp parser.hpp parser tokens.cpp $(OBJS)
 

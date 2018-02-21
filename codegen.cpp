@@ -1,6 +1,4 @@
-#include "node.h"
 #include "codegen.h"
-#include "parser.hpp"
 
 using namespace std;
 
@@ -17,7 +15,6 @@ llvm::Value* NBinaryOperator::codeGen(CodeGenContext& context) {
 	return NULL;
 }
 
-
 llvm::Value* NUnaryOperator::codeGen(CodeGenContext& context) {
 	return NULL;
 }
@@ -27,6 +24,10 @@ llvm::Value* NInteger::codeGen(CodeGenContext& context) {
 }
 
 llvm::Value* NDouble::codeGen(CodeGenContext& context) {
+	return NULL;
+}
+
+llvm::Value* NFuncCall::codeGen(CodeGenContext& context) {
 	return NULL;
 }
 

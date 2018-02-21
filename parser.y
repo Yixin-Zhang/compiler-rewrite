@@ -198,21 +198,21 @@ exp:
 
 
 binop:
-     exp TIMES exp { $$ = new NBinaryOperator($1, $2, $3); }
-     | exp SLASH exp { $$ = new NBinaryOperator($1, $2, $3); }
-     | exp PLUS exp { $$ = new NBinaryOperator($1, $2, $3); }
-     | exp MINUS exp { $$ = new NBinaryOperator($1, $2, $3); }
-     | exp EQL exp { $$ = new NBinaryOperator($1, $2, $3); }
-     | exp LSS exp { $$ = new NBinaryOperator($1, $2, $3); }
-     | exp GTR exp { $$ = new NBinaryOperator($1, $2, $3); }
-     | exp AND exp { $$ = new NBinaryOperator($1, $2, $3); }
-     | exp OR exp { $$ = new NBinaryOperator($1, $2, $3); }
-     | exp ASSIGN exp { $$ = new NBinaryOperator($1, $2, $3); }
+     exp TIMES exp { $$ = new NBinaryOperator($1, OP_TIMES, $3); }
+     | exp SLASH exp { $$ = new NBinaryOperator($1, OP_DIV, $3); }
+     | exp PLUS exp { $$ = new NBinaryOperator($1, OP_PLUS, $3); }
+     | exp MINUS exp { $$ = new NBinaryOperator($1, OP_MINUS, $3); }
+     | exp EQL exp { $$ = new NBinaryOperator($1, OP_EQL, $3); }
+     | exp LSS exp { $$ = new NBinaryOperator($1, OP_LSS, $3); }
+     | exp GTR exp { $$ = new NBinaryOperator($1, OP_GTR, $3); }
+     | exp AND exp { $$ = new NBinaryOperator($1, OP_AND, $3); }
+     | exp OR exp { $$ = new NBinaryOperator($1, OP_OR, $3); }
+     | exp ASSIGN exp { $$ = new NBinaryOperator($1, OP_ASSIGN, $3); }
      ;
 
 uop:
-   NOT exp { $$ = new NUnaryOperator($1, $2); }
-   | MINUS exp %prec NEG { $$ = new NUnaryOperator($1, $2); }
+   NOT exp { $$ = new NUnaryOperator(OP_NOT, $2); }
+   | MINUS exp %prec NEG { $$ = new NUnaryOperator(OP_MINUS, $2); }
    ;
 
 lit:
@@ -297,9 +297,15 @@ int main(int argc, char **argv) {
 
   if (!outputfile.empty()) {
     cout << "Writing parsed AST tree to outputfile: " << outputfile << endl;
-    // YAML output
+    if (programBlock != NULL) {
+      ofstream ofs(outputfile);
+      programBlock->yaml_output(ofs, 0);
+    }
   } else if (emit_ast) {
     // YAML to stdout
+    if (programBlock != NULL) {
+      programBlock->yaml_output(cout, 0);;
+    }
   }
 
   cout << "Done." << endl;
