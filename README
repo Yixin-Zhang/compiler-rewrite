@@ -2,6 +2,16 @@ Members:
  - Weixiang Weng
  - Yixin Zhang
 
+*****************************************************************************
+NOTE: We put our llvm source code under user home directory (in Makefile we
+have LLVMPATH=~/llvm, if your LLVM is in different directories, please change
+it accordingly:
+1. If your llvm is installed in your system include directories, e.g.
+/usr/include etc. You can remove the -I option when compiling using g++)
+2. If you also manually installed your llvm, please specify your llvm include
+path using LLVMPATH in Makefile.
+*****************************************************************************
+
 We used Bison & Flex to generate our parser and the environment is Mac OS X.
 
 To generate the parser, simply run 'make' or 'make parser'.
