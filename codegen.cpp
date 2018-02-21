@@ -96,13 +96,13 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context) {
         case OP_GTR: instr = Instruction::FGt; goto math;
         case OP_AND: instr = Instruction::FAnd; goto math;
         case OP_OR: instr = Instruction::FOr; goto math;
-        case OP_ASSIGN: return NAssignment_codeGen(context);
+        case OP_ASSIGN: return NAssignment_codeGen(context, lhs, rhs);
     }
     
     return NULL;
 math:
-    return BinaryOperator::Create(instr, lhs.codeGen(context),
-                                  rhs.codeGen(context), "", context.currentBlock());
+    return BinaryOperator::Create(instr, lhs->codeGen(context),
+                                  rhs->codeGen(context), "", context.currentBlock());
 }
 
 Value* NUnaryOperator::codeGen(CodeGenContext& context) {
@@ -118,12 +118,12 @@ math1:
     string i = "0";
     auto a = new NInteger(i);
     return BinaryOperator::Create(instr, a.codeGen(context),
-                                  rhs.codeGen(context), "", context.currentBlock());
+                                  rhs->codeGen(context), "", context.currentBlock());
 math2:
     string j = "-1";
     auto b = new NInteger(j);
     return BinaryOperator::Create(instr, b.codeGen(context),
-                                  rhs.codeGen(context), "", context.currentBlock());
+                                  rhs->codeGen(context), "", context.currentBlock());
 }
 
 Value* NInteger::codeGen(CodeGenContext& context) {
@@ -136,13 +136,13 @@ Value* NDouble::codeGen(CodeGenContext& context) {
     return ConstantFP::get(Type::getDoubleTy(MyContext), value);
 }
 
-Value* NAssignment_codeGen(CodeGenContext& context) {
-    std::cout << "Creating assignment for " << lhs.name.name << endl;
-    if (context.locals().find(lhs.name.name) == context.locals().end()) {
-        std::cerr << "undeclared variable " << lhs.name.name << endl;
+Value* NAssignment_codeGen(CodeGenContext& context, NExpression *lhs, NExpression *rhs) {
+    std::cout << "Creating assignment for " << lhs->name.name << endl;
+    if (context.locals().find(lhs->name.name) == context.locals().end()) {
+        std::cerr << "undeclared variable " << lhs->name.name << endl;
         return NULL;
     }
-    return new StoreInst(rhs.codeGen(context), context.locals()[lhs.name.name], false, context.currentBlock());
+    return new StoreInst(rhs->codeGen(context), context.locals()[lhs->name.name], false, context.currentBlock());
 }
 
 Value* NReturnStatement::codeGen(CodeGenContext& context) {
@@ -232,7 +232,10 @@ Value* NExternDeclaration::codeGen(CodeGenContext& context) {
 }
 
 Value* NVariableDeclaration::codeGen(CodeGenContext& context) {
-    return NULL;
+    std::cout << "Creating variable declaration " << type << " " << var->name.name << endl;
+    AllocaInst *alloc = new AllocaInst(typeOf(type), var->name.name.c_str(), context.currentBlock());
+    context.locals()[var->name.name] = alloc;
+    return alloc;
 }
 
 Value* NWhileStatement::codeGen(CodeGenContext& context) {
@@ -252,7 +255,11 @@ Value* NPrintSlitStatement::codeGen(CodeGenContext& context) {
 }
 
 Value* NAssignStatement::codeGen(CodeGenContext& context) {
-    return NULL;
+    AllocaInst *alloc = vdecl->codeGen(context);
+    if (assignmentExpr != NULL) {
+        NAssignment_codeGen(context, vdecl->var, exp);
+    }
+    return alloc;
 }
 
 Value* NExpressionList::codeGen(CodeGenContext& context) {
@@ -260,13 +267,21 @@ Value* NExpressionList::codeGen(CodeGenContext& context) {
 }
 
 Value* NExternList::codeGen(CodeGenContext& context) {
+    for (auto it = externs.begin(); it != externs.end(); ++it) {
+        (**it).codeGen(context);
+    }
     return NULL;
 }
 
 Value* NFuncList::codeGen(CodeGenContext& context) {
+    for (auto it = funcs.begin(); it != funcs.end(); ++it) {
+        (**it).codeGen(context);
+    }
     return NULL;
 }
 
 Value* NProgram::codeGen(CodeGenContext& context) {
+    externs->codeGen(context);
+    funcs->codeGen(context);
     return NULL;
 }
