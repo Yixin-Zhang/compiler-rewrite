@@ -68,8 +68,8 @@ public:
 
 class NVariable : public NExpression {
 public:
-	const NIdentifier& name;
-	NVariable(const NIdentifier& ident_name) : name(ident_name) {}
+	NIdentifier& name;
+	NVariable(NIdentifier& ident_name) : name(ident_name) {}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 	virtual void yaml_output(ostream& os, int indent = 0);
 };

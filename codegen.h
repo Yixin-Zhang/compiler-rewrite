@@ -46,7 +46,7 @@ public:
     Module *module;
     CodeGenContext() { module = new Module("main", MyContext); }
     
-    void generateCode(NBlock& root);
+    void generateCode(NProgram& root);
     
     GenericValue runCode();
 
