@@ -15,7 +15,7 @@ OBJS = parser.o  \
        codegen.o \
        yaml.o
 
-LLVMPATH=/Users/yixin/llvm
+LLVMPATH=~/llvm
 LLVMCONFIG =$(LLVMPATH)/bin/llvm-config
 
 CPPFLAGS=-std=c++11 -Wno-deprecated-register `$(LLVMCONFIG) --cppflags`

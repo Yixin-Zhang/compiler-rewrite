@@ -5,8 +5,7 @@
 using namespace llvm;
 
 /* Compile the AST into a module */
-void CodeGenContext::generateCode(NProgram& root)
-{
+void CodeGenContext::generateCode(NProgram& root) {
     std::cout << "Generating code...\n";
     
     /* Create the top level interpreter function to call as entry */
@@ -35,7 +34,7 @@ void CodeGenContext::generateCode(NProgram& root)
 /* Executes the AST by running the main function */
 GenericValue CodeGenContext::runCode() {
     std::cout << "Running code...\n";
-    ExecutionEngine *ee = EngineBuilder( unique_ptr<Module>(module) ).create();
+    ExecutionEngine *ee = EngineBuilder( unique_ptr<Module>(module)).create();
     ee->finalizeObject();
     vector<GenericValue> noargs;
     GenericValue v = ee->runFunction(mainFunction, noargs);
@@ -44,8 +43,7 @@ GenericValue CodeGenContext::runCode() {
 }
 
 /* Returns an LLVM type based on the identifier */
-static Type *typeOf(const NIdentifier& type)
-{
+static Type *typeOf(const NIdentifier& type) {
     if (type.name.compare("int") == 0) {
         return Type::getInt64Ty(MyContext);
     }
@@ -56,8 +54,7 @@ static Type *typeOf(const NIdentifier& type)
 }
 
 /* -- Code Generation -- */
-Value* NIdentifier::codeGen(CodeGenContext& context)
-{
+Value* NIdentifier::codeGen(CodeGenContext& context) {
     std::cout << "Creating identifier reference: " << name_ << endl;
     if (context.locals().find(name_) == context.locals().end()) {
         std::cerr << "undeclared variable " << name_ << endl;
