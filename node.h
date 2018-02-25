@@ -203,8 +203,8 @@ public:
 class NVariableDeclaration : public NStatement {
 public:
 	const string& type;
-	const NVariable* var;
-	NVariableDeclaration(const string& type, const NVariable* var) :
+	NVariable* var;
+	NVariableDeclaration(const string& type, NVariable* var) :
 		type(type), var(var) {}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 	virtual void yaml_output(ostream& os, int indent = 0);
