@@ -196,7 +196,7 @@ Value* NBlock::codeGen(CodeGenContext& context) {
     StatementList::const_iterator it;
     Value *last = NULL;
     for (it = statements.begin(); it != statements.end(); it++) {
-        std::cout << "Generating code for " << typeid(**it).name() << endl;
+        //std::cout << "Generating code for " << typeid(**it).name() << endl;
         last = (*it)->codeGen(context);
     }
     std::cout << "Created block" << endl;
