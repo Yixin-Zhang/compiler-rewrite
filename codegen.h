@@ -20,6 +20,8 @@
 #include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/ExecutionEngine/GenericValue.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Transforms/IPO.h>
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
 
 #include "node.h"
 #include "parser.hpp"
@@ -31,6 +33,16 @@ class NBlock;
 static LLVMContext MyContext;
 static IRBuilder<> Builder(MyContext);
 
+// static std::unique_ptr<Module> TheModule;
+// static std::map<std::string, Value *> NamedValues;
+
+/*
+Value *LogErrorV(const char *Str) {
+  LogError(Str);
+  return nullptr;
+}
+*/
+
 class CodeGenBlock {
 public:
     BasicBlock *block;
@@ -41,22 +53,43 @@ public:
 class CodeGenContext {
     std::stack<CodeGenBlock *> blocks;
     Function *mainFunction;
+    bool opt;
 
 public:
-
     Module *module;
-    CodeGenContext() { module = new Module("main", MyContext); }
     
+    CodeGenContext() {
+        module = new Module("main", MyContext);
+        opt = false;
+    }
+
+    void setOpt(bool to_opt) {
+        opt = to_opt;
+    }
+
+    bool getOpt() {
+        return opt;
+    }
+
     void generateCode(NProgram& root);
+
+    // Print out all of the generated code.
+    void printGenCode() {
+        std::cout << "Printing generated code...\n";
+        module->print(errs(), nullptr);
+    };
     
     GenericValue runCode();
 
     std::map<std::string, Value*>& locals() {
-    	return blocks.top()->locals;
+        return blocks.top()->locals ;
     }
     
     BasicBlock *currentBlock() {
-    	return blocks.top()->block;
+        if (!blocks.empty()) {
+            return blocks.top()->block;
+        }
+    	return NULL;
     }
     
     void pushBlock(BasicBlock *block) {
@@ -67,15 +100,21 @@ public:
     
     void popBlock() {
     	CodeGenBlock *top = blocks.top();
-    	blocks.pop(); delete top;
+    	blocks.pop();
+        delete top;
     }
-    
+
     void setCurrentReturnValue(Value *value) {
-    	blocks.top()->returnValue = value;
+        if (!blocks.empty()) {
+            blocks.top()->returnValue = value;
+        }
     }
-    
+
     Value* getCurrentReturnValue() {
-    	return blocks.top()->returnValue;
+        if (!blocks.empty()) {
+            return blocks.top()->returnValue;
+        }
+        return NULL;
     }
 };
 

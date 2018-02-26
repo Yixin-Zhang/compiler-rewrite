@@ -1,5 +1,5 @@
 #include "node.h"
-#include "codeGen.h"
+#include "codegen.h"
 #include "parser.hpp"
 
 using namespace llvm;
@@ -28,16 +28,32 @@ void CodeGenContext::generateCode(NProgram& root) {
     root.codeGen(*this); /* emit bytecode for the toplevel block */
     ReturnInst::Create(MyContext, bblock);
     popBlock();
-    
+
     /* Print the bytecode in a human-readable format
      to see if our program compiled properly
      */
     std::cout << "Code is generated.\n";
     // module->dump();
-    
-    legacy::PassManager pm;
-    pm.add(createPrintModulePass(outs()));
-    pm.run(*module);
+
+    if (getOpt()) {
+        std::cout << "Running optimization...\n";
+        // legacy::PassManager pm;
+        // pm.add(createPrintModulePass(outs()));
+        // pm.run(*module);
+        llvm::legacy::PassManager *pm = new llvm::legacy::PassManager();
+        int optLevel = 3;
+        int sizeLevel = 0;
+        PassManagerBuilder builder;
+        builder.OptLevel = optLevel;
+        builder.SizeLevel = sizeLevel;
+        builder.Inliner = createFunctionInliningPass(optLevel, sizeLevel, true);
+        builder.DisableUnitAtATime = false;
+        builder.DisableUnrollLoops = false;
+        builder.LoopVectorize = true;
+        builder.SLPVectorize = true;
+        builder.populateModulePassManager(*pm);
+        pm->run(*module);
+    }
 }
 
 /* Executes the AST by running the main function */
@@ -95,14 +111,16 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context) {
         case OP_MINUS: instr = Instruction::FSub; goto math;
         case OP_TIMES: instr = Instruction::FMul; goto math;
         case OP_DIV: instr = Instruction::FDiv; goto math;
-        // case OP_EQL: instr = llvm::CmpInst::FCMP_OEQ; goto math;
-        // case OP_LSS: instr = llvm::CmpInst::FCMP_OLT; goto math;
-        // case OP_GTR: instr = llvm::CmpInst::FCMP_OGT; goto math;
         case OP_AND: instr = Instruction::And; goto math;
         case OP_OR: instr = Instruction::Or; goto math;
         case OP_ASSIGN: return NAssignment_codeGen(context, (NVariable*)lhs, rhs);
+        /*
+         * Deal with comparisons later.
+        */
+        // case OP_EQL: instr = llvm::CmpInst::FCMP_OEQ; goto math;
+        // case OP_LSS: instr = llvm::CmpInst::FCMP_OLT; goto math;
+        // case OP_GTR: instr = llvm::CmpInst::FCMP_OGT; goto math;
     }
-    
     return NULL;
 math:
     return BinaryOperator::Create(instr, lhs->codeGen(context),
@@ -110,24 +128,25 @@ math:
 }
 
 Value* NUnaryOperator::codeGen(CodeGenContext& context) {
-    string i = "0";
-    auto a = new NInteger(i);
-    string j = "-1";
-    auto b = new NInteger(j);
+    auto zero = new NInteger(string("0"));
+    auto neg_one = new NInteger(string("-1"));
     std::cout << "Creating unary operation " << op << endl;
     Instruction::BinaryOps instr;
     switch (op) {
-        case OP_MINUS: instr = Instruction::FSub; goto math1;
-        case OP_NOT: instr = Instruction::FMul; goto math2;
+        case OP_MINUS:
+        {
+            instr = Instruction::FSub;
+            return BinaryOperator::Create(instr, zero->codeGen(context),
+                rhs->codeGen(context), "", context.currentBlock());
+        }
+        case OP_NOT:
+        {
+            instr = Instruction::FMul;
+            return BinaryOperator::Create(instr, neg_one->codeGen(context),
+                rhs->codeGen(context), "", context.currentBlock());
+        }
     }
-    
     return NULL;
-math1:
-    return BinaryOperator::Create(instr, a->codeGen(context),
-                                  rhs->codeGen(context), "", context.currentBlock());
-math2:
-    return BinaryOperator::Create(instr, b->codeGen(context),
-                                  rhs->codeGen(context), "", context.currentBlock());
 }
 
 Value* NInteger::codeGen(CodeGenContext& context) {
@@ -139,7 +158,6 @@ Value* NDouble::codeGen(CodeGenContext& context) {
     std::cout << "Creating double: " << value << endl;
     return ConstantFP::get(Type::getDoubleTy(MyContext), value);
 }
-
 
 Value* NReturnStatement::codeGen(CodeGenContext& context) {
     if (!exp) {
@@ -170,7 +188,7 @@ Value* NFuncCall::codeGen(CodeGenContext& context) {
         args.push_back((**it).codeGen(context));
     }
     CallInst *call = CallInst::Create(function, makeArrayRef(args), "", context.currentBlock());
-    std::cout << "Creating method call: " << funcname->name << endl;
+    std::cout << "Created method call: " << funcname->name << endl;
     return call;
 }
 
@@ -179,9 +197,9 @@ Value* NBlock::codeGen(CodeGenContext& context) {
     Value *last = NULL;
     for (it = statements.begin(); it != statements.end(); it++) {
         std::cout << "Generating code for " << typeid(**it).name() << endl;
-        last = (**it).codeGen(context);
+        last = (*it)->codeGen(context);
     }
-    std::cout << "Creating block" << endl;
+    std::cout << "Created block" << endl;
     return last;
 }
 
@@ -194,25 +212,24 @@ Value* NFunctionDeclaration::codeGen(CodeGenContext& context) {
     FunctionType *ftype = FunctionType::get(typeOf(type), makeArrayRef(argTypes), false);
     Function *function = Function::Create(ftype, GlobalValue::InternalLinkage, globid->name.c_str(), context.module);
     BasicBlock *bblock = BasicBlock::Create(MyContext, "entry", function, 0);
-    
+
     context.pushBlock(bblock);
-    
+
     Function::arg_iterator argsValues = function->arg_begin();
     Value* argumentValue;
     
     for (it = (*vdecls).begin(); it != (*vdecls).end(); it++) {
         (**it).codeGen(context);
-        
         argumentValue = &*argsValues++;
         argumentValue->setName((*it)->var->name.name.c_str());
         StoreInst *inst = new StoreInst(argumentValue, context.locals()[(*it)->var->name.name], false, bblock);
     }
-    
+
     block->codeGen(context);
     ReturnInst::Create(MyContext, context.getCurrentReturnValue(), bblock);
     
     context.popBlock();
-    std::cout << "Creating function: " << globid->name << endl;
+    std::cout << "Created function: " << globid->name << endl;
     return function;
 }
 
@@ -369,14 +386,23 @@ Value* NWhileStatement::codeGen(CodeGenContext& context) {
 }
 
 Value* NPrintExpressionStatement::codeGen(CodeGenContext& context) {
-    /*Function *CalleeF = TheModule->getOrInsertFunction("printf",
-                                                       FunctionType::get(IntegerType::getInt32Ty(Context), PointerType::get(Type::getInt8Ty(Context), 0), true)
-                                                       );*/
-    return NULL;
+    // Function *CalleeF = context.module->getOrInsertFunction(
+    //     "printf", FunctionType::get(IntegerType::getInt32Ty(MyContext),
+    //     PointerType::get(Type::getInt8Ty(MyContext), 0), true));
+    Function* CalleeF = context.module->getFunction("printf");
+    std::vector<Value *> ArgsV;
+    ArgsV.push_back(exp->codeGen(context));
+    return Builder.CreateCall(CalleeF, ArgsV, "printfCall");
 }
 
 Value* NPrintSlitStatement::codeGen(CodeGenContext& context) {
-    return NULL;
+    // Function *CalleeF = context.module->getOrInsertFunction(
+    //     "printf", FunctionType::get(IntegerType::getInt32Ty(MyContext),
+    //     PointerType::get(Type::getInt8Ty(MyContext), 0), true));
+    Function* CalleeF = context.module->getFunction("printf");
+    std::vector<Value *> ArgsV;
+    ArgsV.push_back(llvm::ConstantDataArray::getString(MyContext, StringRef(slit.c_str())));
+    return Builder.CreateCall(CalleeF, ArgsV, "printfCall");
 }
 
 Value* NAssignStatement::codeGen(CodeGenContext& context) {
@@ -388,7 +414,13 @@ Value* NAssignStatement::codeGen(CodeGenContext& context) {
 }
 
 Value* NExpressionList::codeGen(CodeGenContext& context) {
-    return NULL;
+    Value* last = NULL;
+    if (!exps.empty()) {
+        for (auto exp : exps) {
+            last = exp->codeGen(context);
+        }
+    }
+    return last;
 }
 
 Value* NExternList::codeGen(CodeGenContext& context) {

@@ -2,6 +2,11 @@ Members:
  - Weixiang Weng
  - Yixin Zhang
 
+Hi Kavon,
+   Because we almost rewrite everything in this assignment, so It takes longer
+   time than expected. We have send an email to Professor Finkel, he said we 
+   can turn in the assignment when we can. So please don't apply the late penalty
+   in this assignment. Thansk!
 *****************************************************************************
 NOTE: We put our llvm source code under user home directory (in Makefile we
 have LLVMPATH=~/llvm, if your LLVM is in different directories, please change

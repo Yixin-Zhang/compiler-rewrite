@@ -25,8 +25,7 @@ llvm::Function* createPrintfFunction(CodeGenContext& context) {
     return func;
 }
 
-void createEchoFunction(CodeGenContext& context, llvm::Function* printfFn)
-{
+void createEchoFunction(CodeGenContext& context, llvm::Function* printfFn) {
     std::vector<llvm::Type*> echo_arg_types;
     echo_arg_types.push_back(llvm::Type::getInt64Ty(MyContext));
 

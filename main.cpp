@@ -12,6 +12,8 @@ void createCoreFunctions(CodeGenContext& context);
 int main(int argc, char **argv) {
  	// By default DO NOT print AST tree to stdout uness -emit-ast is provided.
 	bool emit_ast = false;
+	// Only support -O3 optimization level.
+	bool opt = false;
 	string inputfile, outputfile;
 	for (int i = 1; i < argc; ++i) {
 		if (string(argv[i]).compare(string("-emit-ast")) == 0) {
@@ -25,6 +27,10 @@ int main(int argc, char **argv) {
 			}
 			outputfile = string(argv[i + 1]);
 			i += 1;
+			continue;
+		}
+		if (string(argvp[i].compare(string("-O3"))) == 0) {
+			opt = true;
 			continue;
 		}
 		if (!inputfile.empty()) {
@@ -73,9 +79,11 @@ int main(int argc, char **argv) {
 	InitializeNativeTargetAsmPrinter();
 	InitializeNativeTargetAsmParser();
 	CodeGenContext context;
+	context.setOpt(opt);
 	createCoreFunctions(context);
-	context.generateCode(*programBlock);
-	context.runCode();
+	context.generateCode(*programBlock);	
+	context.printGenCode();
+	// context.runCode();
 	
 	return 0;
 
