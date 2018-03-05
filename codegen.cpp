@@ -107,19 +107,40 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context) {
     std::cout << "Creating binary operation " << op << endl;
     Instruction::BinaryOps instr;
     switch (op) {
-        case OP_PLUS: instr = Instruction::FAdd; goto math;
-        case OP_MINUS: instr = Instruction::FSub; goto math;
-        case OP_TIMES: instr = Instruction::FMul; goto math;
-        case OP_DIV: instr = Instruction::FDiv; goto math;
         case OP_AND: instr = Instruction::And; goto math;
         case OP_OR: instr = Instruction::Or; goto math;
-        case OP_ASSIGN: return NAssignment_codeGen(context, (NVariable*)lhs, rhs);
         /*
          * Deal with comparisons later.
-        */
+         */
         // case OP_EQL: instr = llvm::CmpInst::FCMP_OEQ; goto math;
         // case OP_LSS: instr = llvm::CmpInst::FCMP_OLT; goto math;
         // case OP_GTR: instr = llvm::CmpInst::FCMP_OGT; goto math;
+    }
+    if (exp_type == "float" || exp_type == "sfloat") {
+        switch (op) {
+            case OP_PLUS: instr = Instruction::FAdd; goto math;
+            case OP_MINUS: instr = Instruction::FSub; goto math;
+            case OP_TIMES: instr = Instruction::FMul; goto math;
+            case OP_DIV: instr = Instruction::FDiv; goto math;
+        }
+    } else if (exp_type == "int") {
+        switch (op) {
+            case OP_PLUS: instr = Instruction::SAdd; goto math;
+            case OP_MINUS: instr = Instruction::SSub; goto math;
+            case OP_TIMES: instr = Instruction::SMul; goto math;
+            case OP_DIV: instr = Instruction::SDiv; goto math;
+        }
+    } else if (exp_type == "cint") {
+        std::string op_symbol = new string;
+        switch (op) {
+            case OP_PLUS: op_symbol += "sadd"; break;
+            case OP_MINUS: op_symbol += "ssub"; break;
+            case OP_TIMES: op_symbol += "smul"; break;
+            case OP_DIV: instr = Instruction::SDiv; goto math;
+        }
+        /*we should add some error reporting code here if overflow happens*/
+        std::string overflow_code = new string("%res = call {i32, i1} @llvm."+op_symbol+".with.overflow.i32(i32 %a, i32 %b)\n%sum = extractvalue {i32, i1} %res, 0\n%obit = extractvalue {i32, i1} %res, 1\nbr i1 %obit, label %overflow, label %normal\noverflow:\n\nlabel:\n");
+        return (Value*) overflow_code;
     }
     return NULL;
 math:
@@ -128,10 +149,19 @@ math:
 }
 
 Value* NUnaryOperator::codeGen(CodeGenContext& context) {
+    std::cout << "Creating unary operation " << op << endl;
     auto zero = new NInteger(string("0"));
     auto neg_one = new NInteger(string("-1"));
-    std::cout << "Creating unary operation " << op << endl;
-    Instruction::BinaryOps instr;
+    auto b_zero = new NBinaryOperator(zero, op, rhs, exp_type);
+    auto b_neg_one = new NBinaryOperator(neg_one, op, rhs, exp_type);
+    if (op == OP_MINUS) {
+        return b_zero.codeGen(context);
+    } else if (op == OP_NOT) {
+        return b_neg_one.codeGen(context);
+    }
+    std::cout << "Invalid unary operation!" << endl;
+    return NULL;
+    /*Instruction::BinaryOps instr;
     switch (op) {
         case OP_MINUS:
         {
@@ -146,7 +176,7 @@ Value* NUnaryOperator::codeGen(CodeGenContext& context) {
                 rhs->codeGen(context), "", context.currentBlock());
         }
     }
-    return NULL;
+    return NULL;*/
 }
 
 Value* NInteger::codeGen(CodeGenContext& context) {
