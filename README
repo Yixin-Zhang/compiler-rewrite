@@ -25,3 +25,5 @@ If not options specified, the parser will silently parse the source and check
 any syntax errors, and won't print the output.
 
 Run "make clean" to clean up the intermediate files generated.
+
+Since we still didn't finish our final codegen version, we just added the code which is related to cint check to the files. So it may not run well.
