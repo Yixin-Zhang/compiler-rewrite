@@ -52,6 +52,15 @@ public:
 };
 
 class NExpression : public Node {
+public:
+    std::string exp_type;
+    int mark;
+    //for variable, mark = 1; for int, mark = 2; for float, mark = 3; for call, mark = 4; for unary operation, mark = 5; for binary operation, mark = 6.
+    
+    NExpression(string exp_type_name, int mark_number) {
+        exp_type_name = exp_type;
+        mark = mark_number;
+    }
 };
 
 class NStatement : public Node {		
@@ -60,7 +69,7 @@ class NStatement : public Node {
 class NIdentifier : public NExpression {
 public:
 	std::string name;
-	NIdentifier(const std::string& name) : name(name) { }
+    NIdentifier(const std::string& name_) { name = name_; }
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 	virtual void yaml_output(ostream& os, int indent = 0);
 };
@@ -69,7 +78,9 @@ public:
 class NVariable : public NExpression {
 public:
 	NIdentifier& name;
-	NVariable(NIdentifier& ident_name) : name(ident_name) {}
+    NVariable(NIdentifier& ident_name, string exp_type_name) : NExpression(exp_type_name, 1) {
+        name = name_;
+    }
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 	virtual void yaml_output(ostream& os, int indent = 0);
 };
@@ -79,8 +90,11 @@ public:
 	int op;
 	NExpression* lhs;
 	NExpression* rhs;
-	NBinaryOperator(NExpression* lhs, int op, NExpression* rhs) :
-		lhs(lhs), rhs(rhs), op(op) {}
+	NBinaryOperator(NExpression* lhs_, int op_, NExpression* rhs_, string exp_type_name) : NExpression(exp_type_name, 6) {
+        lhs = lhs_;
+        rhs = rhs_;
+        op = op_;
+    }
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 	virtual void yaml_output(ostream& os, int indent = 0);
 };
@@ -89,7 +103,10 @@ class NUnaryOperator : public NExpression {
 public:
 	int op;
 	NExpression* rhs;
-	NUnaryOperator(int op, NExpression* rhs) : rhs(rhs), op(op) { }
+	NUnaryOperator(int op_, NExpression* rhs_, string exp_type_name) : NExpression(exp_type_name, 5) {
+        rhs = rhs_;
+        op = op_;
+    }
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 	virtual void yaml_output(ostream& os, int indent = 0);
 };
@@ -97,7 +114,7 @@ public:
 class NInteger : public NExpression {
 public:
 	long long value;
-	NInteger(const string& str) {
+	NInteger(const string& str, string exp_type_name) : NExpression(exp_type_name, 2) {
 		value = stol(str);
 	}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
@@ -107,7 +124,7 @@ public:
 class NDouble : public NExpression {
 public:
 	double value;
-	NDouble(const string& str) {
+	NDouble(const string& str, string exp_type_name) : NExpression(exp_type_name, 3) {
 		value = stod(str);
 	}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
@@ -118,13 +135,14 @@ class NFuncCall : public NExpression {
 public:
 	NIdentifier* funcname;
 	ExpressionList* exps;
-	NFuncCall(NIdentifier* funcname, ExpressionList* exps) :
-		funcname(funcname), exps(exps) {}
+	NFuncCall(NIdentifier* func_name, ExpressionList* exps_, string exp_type_name) : NExpression(exp_type_name, 4)
+    {   funcname = func_name;
+        exps = exps_; }
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
-class NBlock : public NExpression {
+class NBlock : public NStatement {
 public:
 	StatementList statements;
 	NBlock() {
@@ -134,7 +152,7 @@ public:
 	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
-class NReturnStatement : public NBlock {
+class NReturnStatement : public NStatement {
 public:
 	NExpression* exp;
 	NReturnStatement(NExpression* exp) : exp(exp) {}
@@ -144,7 +162,7 @@ public:
 	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
-class NAssignStatement : public NBlock {
+class NAssignStatement : public NStatement {
 public:
 	NVariableDeclaration* vdecl;
 	NExpression* exp;
@@ -154,7 +172,7 @@ public:
 	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
-class NExpressionStatement : public NBlock {		
+class NExpressionStatement : public NStatement {
 public:
 	NExpression* exp;
 	NExpressionStatement(NExpression* expression) : 
@@ -163,7 +181,7 @@ public:
 	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
-class NWhileStatement : public NBlock {
+class NWhileStatement : public NStatement {
 public:
 	NExpression* exp;
 	NBlock* stmt;
@@ -173,7 +191,7 @@ public:
 	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
-class NIfStatement : public NBlock {
+class NIfStatement : public NStatement {
 public:
 	NExpression* exp;
 	NBlock* stmt;
@@ -184,7 +202,7 @@ public:
 	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
-class NPrintExpressionStatement : public NBlock {
+class NPrintExpressionStatement : public NStatement {
 public:
 	NExpression* exp;
 	NPrintExpressionStatement(NExpression* exp) : exp(exp) {}
@@ -192,7 +210,7 @@ public:
 	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
-class NPrintSlitStatement : public NBlock {
+class NPrintSlitStatement : public NStatement {
 public:
 	const string slit;
 	NPrintSlitStatement(const string& str) : slit(str) {}
@@ -200,7 +218,7 @@ public:
 	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
-class NVariableDeclaration : public NStatement {
+class NVariableDeclaration : public Node {
 public:
 	const string& type;
 	NVariable* var;
@@ -210,7 +228,7 @@ public:
 	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
-class NFunctionDeclaration : public NBlock {
+class NFunctionDeclaration : public Node{
 public:
 	const string& type;
 	const NIdentifier* globid;
@@ -223,7 +241,7 @@ public:
 	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
-class NExternDeclaration : public NStatement {
+class NExternDeclaration : public Node {
 public:
     const string& type;
     const NIdentifier* globid;
@@ -235,7 +253,7 @@ public:
     virtual void yaml_output(ostream& os, int indent = 0);
 };
 
-class NExpressionList : public NExpression {
+class NExpressionList : public Node {
 public:
 	ExpressionList exps;
 	NExpressionList() {
@@ -245,7 +263,7 @@ public:
 	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
-class NExternList : public NStatement {
+class NExternList : public Node {
 public:
 	ExternList externs;
 	NExternList() {
@@ -255,7 +273,7 @@ public:
 	virtual void yaml_output(ostream& os, int indent = 0);
 };
 
-class NFuncList : public NStatement {
+class NFuncList : public Node {
 public:
 	FuncList funcs;
 	NFuncList() {
