@@ -2,6 +2,7 @@
   #include "node.h"
   #include <cstdio>
   #include <cstdlib>
+  #include <unordered_map>
   NProgram* programBlock; /* the top level root node of our final AST */
 
   // stuff from flex that bison needs to know about:
@@ -11,10 +12,15 @@
   extern "C" FILE *yyin;
   extern int yylineno;
   extern int yycolumn;
+  
+  unordered_map<string, string> globid_type;  //record the return type of each function
+  unordered_map<string, string> var_type;  //record the type of each variable
+  
   void yyerror(const char *s) {
     fprintf(stderr, "Error | Line: %d, Column: %d: %s\n", yylineno, yycolumn, s);
     exit(1);
   }
+  string type_inference(NExpression *node);
 %}
 
 %locations
@@ -115,12 +121,9 @@ funcs:
 
 func:
     DEFSYM type globid LP opt_vdecls RP blk {
+      var_type.clear();
+      globid_type[$3] = $2;
       $$ = new NFunctionDeclaration(*$2, $3, $5, $7);
-      // for (auto a : used_function_names) { if (defined_function_names.find(a) == defined_function_names.end())
-      //   cout << "error: All functions must be declared and/or defined before they are used." << endl; }
-      // used_function_names.clear();
-      // var_type.clear();
-      // globid_type[$3] = $2;
     }
     ;
 
@@ -135,7 +138,7 @@ vdecls:
       ;
 
 vdecl:
-      type var { $$ = new NVariableDeclaration(*$1, $2); }
+      type var { var_type[$2] = $1; $$ = new NVariableDeclaration(*$1, $2); }
       ;
 
 opt_tdecls:
@@ -193,31 +196,31 @@ exp:
    | uop { $$ = $1; }
    | lit { $$ = $1; }
    | var { $$ = $1; }
-   | globid LP opt_exps RP { $$ = $3; }
+   | globid LP opt_exps RP { $$ = new NFuncCall($1, $3, globid_type[node->funcname->name]); }
    ;
 
 
 binop:
-     exp TIMES exp { $$ = new NBinaryOperator($1, OP_TIMES, $3); }
-     | exp SLASH exp { $$ = new NBinaryOperator($1, OP_DIV, $3); }
-     | exp PLUS exp { $$ = new NBinaryOperator($1, OP_PLUS, $3); }
-     | exp MINUS exp { $$ = new NBinaryOperator($1, OP_MINUS, $3); }
-     | exp EQL exp { $$ = new NBinaryOperator($1, OP_EQL, $3); }
-     | exp LSS exp { $$ = new NBinaryOperator($1, OP_LSS, $3); }
-     | exp GTR exp { $$ = new NBinaryOperator($1, OP_GTR, $3); }
-     | exp AND exp { $$ = new NBinaryOperator($1, OP_AND, $3); }
-     | exp OR exp { $$ = new NBinaryOperator($1, OP_OR, $3); }
-     | exp ASSIGN exp { $$ = new NBinaryOperator($1, OP_ASSIGN, $3); }
+     exp TIMES exp { $$ = new NBinaryOperator($1, OP_TIMES, $3, type_inference($1)); }
+     | exp SLASH exp { $$ = new NBinaryOperator($1, OP_DIV, $3, type_inference($1)); }
+     | exp PLUS exp { $$ = new NBinaryOperator($1, OP_PLUS, $3, type_inference($1)); }
+     | exp MINUS exp { $$ = new NBinaryOperator($1, OP_MINUS, $3, type_inference($1)); }
+     | exp EQL exp { $$ = new NBinaryOperator($1, OP_EQL, $3, type_inference($1)); }
+     | exp LSS exp { $$ = new NBinaryOperator($1, OP_LSS, $3, type_inference($1)); }
+     | exp GTR exp { $$ = new NBinaryOperator($1, OP_GTR, $3, type_inference($1)); }
+     | exp AND exp { $$ = new NBinaryOperator($1, OP_AND, $3, type_inference($1)); }
+     | exp OR exp { $$ = new NBinaryOperator($1, OP_OR, $3, type_inference($1)); }
+     | exp ASSIGN exp { $$ = new NBinaryOperator($1, OP_ASSIGN, $3, type_inference($1)); }
      ;
 
 uop:
-   NOT exp { $$ = new NUnaryOperator(OP_NOT, $2); }
-   | MINUS exp %prec NEG { $$ = new NUnaryOperator(OP_MINUS, $2); }
+   NOT exp { $$ = new NUnaryOperator(OP_NOT, $2, type_inference($2)); }
+   | MINUS exp %prec NEG { $$ = new NUnaryOperator(OP_MINUS, $2, type_inference($2)); }
    ;
 
 lit:
-    INTEGER { $$ = new NInteger(*$1); }
-    | DOUBLE { $$ = new NDouble(*$1); }
+    INTEGER { $$ = new NInteger(*$1, "int"); }
+    | DOUBLE { $$ = new NDouble(*$1, "float"); }
     ;
 
 slit:
@@ -225,7 +228,11 @@ slit:
     ;
 
 var:
-   DOLLOR ident { $$ = new NVariable(*$2); }
+    DOLLOR ident { string s_temp = var_type[$1];
+      auto found = s_temp.find("ref ");
+      if (found != string::npos)
+        s_temp = s_temp.substr(found+4);
+      $$ = new NVariable(*$2, s_temp); }
    ;
 
 ident:
@@ -247,3 +254,33 @@ type:
     ;
 
 %%
+
+string type_inference(NExpression *node) {
+    switch(node->mark) {
+        case 1: {  //variable expression
+            string s_temp = var_type[node->name->name];
+            auto found = s_temp.find("ref ");
+            if (found != string::npos)
+                s_temp = s_temp.substr(found+4);
+            return s_temp;
+        }
+        case 2: {  //int expression
+            return "int";
+        }
+        case 3: {  //float expression
+            return "float";
+        }
+        case 4: {  //call expression
+            return globid_type[node->funcname->name];
+        }
+        case 5: {  //unary operation expression
+            return type_inference(node->rhs);
+        }
+        case 6: {  //binary operation expression
+            return type_inference(node->lhs);
+        }
+        default: {
+            return NULL;
+        }
+    }
+}
