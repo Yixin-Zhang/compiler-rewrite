@@ -6,11 +6,11 @@ using namespace llvm;
 
 Value* NAssignment_codeGen(CodeGenContext& context, NVariable *lhs, NExpression *rhs) {
     std::cout << "Creating assignment... " << endl;
-    if (context.locals().find(lhs->name.name) == context.locals().end()) {
-        std::cerr << "undeclared variable " << lhs->name.name << endl;
+    if (context.locals().find(lhs->name->name) == context.locals().end()) {
+        std::cerr << "undeclared variable " << lhs->name->name << endl;
         return NULL;
     }
-    return new StoreInst(rhs->codeGen(context), context.locals()[lhs->name.name], false, context.currentBlock());
+    return new StoreInst(rhs->codeGen(context), context.locals()[lhs->name->name], false, context.currentBlock());
 }
 
 /* Compile the AST into a module */
@@ -99,8 +99,8 @@ Value* NIdentifier::codeGen(CodeGenContext& context) {
 }
 
 Value* NVariable::codeGen(CodeGenContext& context) {
-    std::cout << "Creating variable: " << name.name << endl;
-    return name.codeGen(context);
+    std::cout << "Creating variable: " << name->name << endl;
+    return name->codeGen(context);
 }
 
 Value* NBinaryOperator::codeGen(CodeGenContext& context) {
@@ -116,7 +116,14 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context) {
         // case OP_LSS: instr = llvm::CmpInst::FCMP_OLT; goto math;
         // case OP_GTR: instr = llvm::CmpInst::FCMP_OGT; goto math;
     }
-    if (exp_type == "float" || exp_type == "sfloat") {
+    if (exp_type == "float") {
+        switch (op) {
+            case OP_PLUS: instr = Instruction::FAdd; goto math;
+            case OP_MINUS: instr = Instruction::FSub; goto math;
+            case OP_TIMES: instr = Instruction::FMul; goto math;
+            case OP_DIV: instr = Instruction::FDiv; goto math;
+        }
+    } else if (exp_type == "sfloat") {
         switch (op) {
             case OP_PLUS: instr = Instruction::FAdd; goto math;
             case OP_MINUS: instr = Instruction::FSub; goto math;
@@ -125,23 +132,23 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context) {
         }
     } else if (exp_type == "int") {
         switch (op) {
-            case OP_PLUS: instr = Instruction::SAdd; goto math;
-            case OP_MINUS: instr = Instruction::SSub; goto math;
-            case OP_TIMES: instr = Instruction::SMul; goto math;
-            case OP_DIV: instr = Instruction::SDiv; goto math;
+            case OP_PLUS: instr = Instruction::FAdd; goto math;
+            case OP_MINUS: instr = Instruction::FSub; goto math;
+            case OP_TIMES: instr = Instruction::FMul; goto math;
+            case OP_DIV: instr = Instruction::FDiv; goto math;
         }
-    } else if (exp_type == "cint") {
-        std::string op_symbol = new string;
+    } /*else if (exp_type == "cint") {
+        std::string op_symbol = new string("");
         switch (op) {
             case OP_PLUS: op_symbol += "sadd"; break;
             case OP_MINUS: op_symbol += "ssub"; break;
             case OP_TIMES: op_symbol += "smul"; break;
             case OP_DIV: instr = Instruction::SDiv; goto math;
         }
-        /*we should add some error reporting code here if overflow happens*/
+        //we should add some error reporting code here if overflow happens
         std::string overflow_code = new string("%res = call {i32, i1} @llvm."+op_symbol+".with.overflow.i32(i32 %a, i32 %b)\n%sum = extractvalue {i32, i1} %res, 0\n%obit = extractvalue {i32, i1} %res, 1\nbr i1 %obit, label %overflow, label %normal\noverflow:\n\nlabel:\n");
         return (Value*) overflow_code;
-    }
+    }*/
     return NULL;
 math:
     return BinaryOperator::Create(instr, lhs->codeGen(context),
@@ -150,14 +157,14 @@ math:
 
 Value* NUnaryOperator::codeGen(CodeGenContext& context) {
     std::cout << "Creating unary operation " << op << endl;
-    auto zero = new NInteger(string("0"));
-    auto neg_one = new NInteger(string("-1"));
+    auto zero = new NInteger(string("0"), "int");
+    auto neg_one = new NInteger(string("-1"), "int");
     auto b_zero = new NBinaryOperator(zero, op, rhs, exp_type);
     auto b_neg_one = new NBinaryOperator(neg_one, op, rhs, exp_type);
     if (op == OP_MINUS) {
-        return b_zero.codeGen(context);
+        return b_zero->codeGen(context);
     } else if (op == OP_NOT) {
-        return b_neg_one.codeGen(context);
+        return b_neg_one->codeGen(context);
     }
     std::cout << "Invalid unary operation!" << endl;
     return NULL;
@@ -214,7 +221,7 @@ Value* NFuncCall::codeGen(CodeGenContext& context) {
     }
     std::vector<Value*> args;
     ExpressionList::const_iterator it;
-    for (it = (*exps).begin(); it != (*exps).end(); it++) {
+    for (it = (exps->exps).begin(); it != (exps->exps).end(); it++) {
         args.push_back((**it).codeGen(context));
     }
     CallInst *call = CallInst::Create(function, makeArrayRef(args), "", context.currentBlock());
@@ -251,8 +258,8 @@ Value* NFunctionDeclaration::codeGen(CodeGenContext& context) {
     for (it = (*vdecls).begin(); it != (*vdecls).end(); it++) {
         (**it).codeGen(context);
         argumentValue = &*argsValues++;
-        argumentValue->setName((*it)->var->name.name.c_str());
-        StoreInst *inst = new StoreInst(argumentValue, context.locals()[(*it)->var->name.name], false, bblock);
+        argumentValue->setName((*it)->var->name->name.c_str());
+        StoreInst *inst = new StoreInst(argumentValue, context.locals()[(*it)->var->name->name], false, bblock);
     }
 
     block->codeGen(context);
@@ -275,9 +282,9 @@ Value* NExternDeclaration::codeGen(CodeGenContext& context) {
 }
 
 Value* NVariableDeclaration::codeGen(CodeGenContext& context) {
-    std::cout << "Creating variable declaration " << type << " " << var->name.name << endl;
-    AllocaInst *alloc = new AllocaInst(typeOf(type), 0, var->name.name.c_str(), context.currentBlock());
-    context.locals()[var->name.name] = alloc;
+    std::cout << "Creating variable declaration " << type << " " << var->name->name << endl;
+    AllocaInst *alloc = new AllocaInst(typeOf(type), 0, var->name->name.c_str(), context.currentBlock());
+    context.locals()[var->name->name] = alloc;
     return alloc;
 }
 
@@ -419,20 +426,22 @@ Value* NPrintExpressionStatement::codeGen(CodeGenContext& context) {
     // Function *CalleeF = context.module->getOrInsertFunction(
     //     "printf", FunctionType::get(IntegerType::getInt32Ty(MyContext),
     //     PointerType::get(Type::getInt8Ty(MyContext), 0), true));
-    Function* CalleeF = context.module->getFunction("printf");
+    /*Function* CalleeF = context.module->getFunction("printf");
     std::vector<Value *> ArgsV;
     ArgsV.push_back(exp->codeGen(context));
-    return Builder.CreateCall(CalleeF, ArgsV, "printfCall");
+    return Builder.CreateCall(CalleeF, ArgsV, "printfCall");*/
+    return NULL;
 }
 
 Value* NPrintSlitStatement::codeGen(CodeGenContext& context) {
     // Function *CalleeF = context.module->getOrInsertFunction(
     //     "printf", FunctionType::get(IntegerType::getInt32Ty(MyContext),
     //     PointerType::get(Type::getInt8Ty(MyContext), 0), true));
-    Function* CalleeF = context.module->getFunction("printf");
+    /*Function* CalleeF = context.module->getFunction("printf");
     std::vector<Value *> ArgsV;
     ArgsV.push_back(llvm::ConstantDataArray::getString(MyContext, StringRef(slit.c_str())));
-    return Builder.CreateCall(CalleeF, ArgsV, "printfCall");
+    return Builder.CreateCall(CalleeF, ArgsV, "printfCall");*/
+    return NULL;
 }
 
 Value* NAssignStatement::codeGen(CodeGenContext& context) {
