@@ -10,14 +10,16 @@ using namespace std;
 using namespace llvm;
 
 class CodeGenContext;
+class Node;
 class NStatement;
 class NExpression;
 class NVariableDeclaration;
 class NExternDeclaration;
 class NFunctionDeclaration;
 class NBlock;
+class NExpressionList;
 
-typedef std::vector<NBlock*> StatementList;
+typedef std::vector<NStatement*> StatementList;
 typedef std::vector<NExpression*> ExpressionList;
 
 typedef std::vector<NExternDeclaration*> ExternList;
@@ -58,7 +60,7 @@ public:
     //for variable, mark = 1; for int, mark = 2; for float, mark = 3; for call, mark = 4; for unary operation, mark = 5; for binary operation, mark = 6.
     
     NExpression(string exp_type_name, int mark_number) {
-        exp_type_name = exp_type;
+        exp_type = exp_type_name;
         mark = mark_number;
     }
 };
@@ -66,7 +68,7 @@ public:
 class NStatement : public Node {		
 };
 
-class NIdentifier : public NExpression {
+class NIdentifier : public Node {
 public:
 	std::string name;
     NIdentifier(const std::string& name_) { name = name_; }
@@ -77,9 +79,9 @@ public:
 
 class NVariable : public NExpression {
 public:
-	NIdentifier& name;
-    NVariable(NIdentifier& ident_name, string exp_type_name) : NExpression(exp_type_name, 1) {
-        name = name_;
+	NIdentifier* name;
+    NVariable(NIdentifier* ident_name, string exp_type_name) : NExpression(exp_type_name, 1) {
+        name = ident_name;
     }
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 	virtual void yaml_output(ostream& os, int indent = 0);
@@ -134,8 +136,8 @@ public:
 class NFuncCall : public NExpression {
 public:
 	NIdentifier* funcname;
-	ExpressionList* exps;
-	NFuncCall(NIdentifier* func_name, ExpressionList* exps_, string exp_type_name) : NExpression(exp_type_name, 4)
+	NExpressionList* exps;
+	NFuncCall(NIdentifier* func_name, NExpressionList* exps_, string exp_type_name) : NExpression(exp_type_name, 4)
     {   funcname = func_name;
         exps = exps_; }
 	virtual llvm::Value* codeGen(CodeGenContext& context);
@@ -184,8 +186,8 @@ public:
 class NWhileStatement : public NStatement {
 public:
 	NExpression* exp;
-	NBlock* stmt;
-	NWhileStatement(NExpression* exp, NBlock* stmt) :
+	NStatement* stmt;
+	NWhileStatement(NExpression* exp, NStatement* stmt) :
 		exp(exp), stmt(stmt) {}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 	virtual void yaml_output(ostream& os, int indent = 0);
@@ -194,9 +196,9 @@ public:
 class NIfStatement : public NStatement {
 public:
 	NExpression* exp;
-	NBlock* stmt;
-	NBlock* else_stmt;
-	NIfStatement(NExpression* exp, NBlock* stmt, NBlock* else_stmt) :
+	NStatement* stmt;
+	NStatement* else_stmt;
+	NIfStatement(NExpression* exp, NStatement* stmt, NStatement* else_stmt) :
 		exp(exp), stmt(stmt), else_stmt(else_stmt) {}
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 	virtual void yaml_output(ostream& os, int indent = 0);
