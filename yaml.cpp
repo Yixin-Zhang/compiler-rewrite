@@ -14,7 +14,7 @@ void NVariable::yaml_output(ostream& os, int indent) {
    os << "name: varval\n";
 
    print_indent(os, indent);
-   os << "var: " << name.name << "\n";
+   os << "var: " << name->name << "\n";
 }
 
 void NBinaryOperator::yaml_output(ostream& os, int indent) {
@@ -62,6 +62,7 @@ void NBinaryOperator::yaml_output(ostream& os, int indent) {
 		}
 		case OP_ASSIGN: {
 			os << "assign";
+            break;
 		}
 		default:
 		os << "??? UNsupported binop.";
@@ -118,11 +119,17 @@ void NFuncCall::yaml_output(ostream& os, int indent) {
 	os << "name: funccall\n";
 
 	print_indent(os, indent);
-	os << "globid: " << funcname << "\n";
+	os << "globid: " << funcname->name << "\n";
 	print_indent(os, indent);
 	os << "params:\n";
-	for (auto exp : *exps) {
-		exp->yaml_output(os, indent+2);
+    print_indent(os, indent + 2);
+    os << "name: exps\n";
+    print_indent(os, indent + 2);
+    os << "exps:\n";
+	for (auto exp : exps->exps) {
+        print_indent(os, indent + 4);
+        os << "-\n";
+		exp->yaml_output(os, indent + 6);
 	}
 }
 
@@ -223,7 +230,7 @@ void NVariableDeclaration::yaml_output(ostream& os, int indent) {
 	print_indent(os, indent);
 	os << "type: " << type << "\n";
 	print_indent(os, indent);
-	os << "var: " << var->name.name << "\n";
+	os << "var: " << var->name->name << "\n";
 }
 
 void NFunctionDeclaration::yaml_output(ostream& os, int indent) {
@@ -237,16 +244,16 @@ void NFunctionDeclaration::yaml_output(ostream& os, int indent) {
 	os << "globid: " << globid->name << "\n";
 	if (vdecls != NULL) {
     	// vdecls->yaml_output(os, indent + 2);
-		print_indent(os, indent);
+		print_indent(os, indent + 2);
 		os << "vdecls:\n";
-		print_indent(os, indent + 2);
+		print_indent(os, indent + 4);
 		os << "name: vdecls\n";
-		print_indent(os, indent + 2);
+		print_indent(os, indent + 4);
 		os << "vars:\n";
 		for (auto vdecl : *vdecls) {
-			print_indent(os, indent + 4);
+			print_indent(os, indent + 6);
 			os << "-\n";
-			vdecl->yaml_output(os, indent + 6);
+			vdecl->yaml_output(os, indent + 8);
 		}
 	}
 
@@ -269,7 +276,7 @@ void NExternDeclaration::yaml_output(ostream& os, int indent) {
 
     // tdecls is a vector of strings
 	if (tdecls != NULL && tdecls->size() > 0) {
-		print_indent(os, indent + 4);
+		print_indent(os, indent + 2);
 		os << "tdecls:\n";
 		print_indent(os, indent + 4);
 		os << "name: tdecls\n";
@@ -299,9 +306,9 @@ void NExpressionList::yaml_output(ostream& os, int indent) {
 void NExternList::yaml_output(ostream& os, int indent) {
 	if (externs.size() > 0) {
 		os << "externs:\n";
-		print_indent(os, indent);
+		print_indent(os, indent + 2);
 		os << "name: externs\n";
-		print_indent(os, indent);
+		print_indent(os, indent + 2);
 		os << "externs: \n";
 		for (auto exter : externs) {
 			exter->yaml_output(os, indent + 4);
