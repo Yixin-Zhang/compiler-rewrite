@@ -27,8 +27,9 @@
 
 /* Represents the many different ways we can access our data */
 %union {
+  NStatement* stmt;
   NBlock* block;
-  NExpression *expr;
+  NExpression* expr;
   NProgram* program_type;
   NExternList* externlist_type;
   NFuncList* funclist_type;
@@ -91,7 +92,8 @@
 %type <var_type> var
 %type <str> type slit
 
-%type <block> blk opt_stmts stmts stmt opt_else
+%type <block> blk opt_stmts stmts
+%type <stmt> stmt opt_else
 
 %%
 
@@ -101,7 +103,7 @@ prog:
 
 opt_externs:
        externs { $$ = $1; }
-       | { $$ = new NExternList(); }
+       | { $$ = NULL; }
        ;
 
 externs:
@@ -122,14 +124,14 @@ funcs:
 func:
     DEFSYM type globid LP opt_vdecls RP blk {
       var_type.clear();
-      globid_type[$3] = $2;
+      globid_type[$3->name] = *$2;
       $$ = new NFunctionDeclaration(*$2, $3, $5, $7);
     }
     ;
 
 opt_vdecls:
          vdecls { $$ = $1; }
-         | { $$ = new std::vector<NVariableDeclaration*>(); }
+         | { $$ = NULL; }
          ;
 
 vdecls:
@@ -138,7 +140,7 @@ vdecls:
       ;
 
 vdecl:
-      type var { var_type[$2] = $1; $$ = new NVariableDeclaration(*$1, $2); }
+      type var { var_type[$2->name->name] = *$1; $$ = new NVariableDeclaration(*$1, $2); }
       ;
 
 opt_tdecls:
@@ -156,7 +158,7 @@ blk:
    ;
 opt_stmts:
           stmts { $$ = $1; }
-          | { $$ = new NBlock(); }
+          | { $$ = NULL; }
          ;
 stmts:
      stmts stmt { $1->statements.push_back($2); $$ = $1; }
@@ -177,7 +179,7 @@ stmt:
 
 opt_else:
       ELSESYM stmt { $$ = $2; }
-      | { $$ = new NBlock(); }
+      | { $$ = NULL; }
       ;
 
 opt_exps:
@@ -196,7 +198,7 @@ exp:
    | uop { $$ = $1; }
    | lit { $$ = $1; }
    | var { $$ = $1; }
-   | globid LP opt_exps RP { $$ = new NFuncCall($1, $3, globid_type[node->funcname->name]); }
+   | globid LP opt_exps RP { $$ = new NFuncCall($1, $3, globid_type[$1->name]); }
    ;
 
 
@@ -228,11 +230,11 @@ slit:
     ;
 
 var:
-    DOLLOR ident { string s_temp = var_type[$1];
+    DOLLOR ident { string s_temp = var_type[$2->name];
       auto found = s_temp.find("ref ");
       if (found != string::npos)
         s_temp = s_temp.substr(found+4);
-      $$ = new NVariable(*$2, s_temp); }
+      $$ = new NVariable($2, s_temp); }
    ;
 
 ident:
@@ -249,7 +251,7 @@ type:
     | FLOATTYPE { $$ = new string("float"); }
     | SFLOATTYPE { $$ = new string("sfloat"); }
     | VOIDTYPE { $$ = new string("void"); }
-    | REFTYPE type { $$ = new string(string("ref").append(*$2)); }
+    | REFTYPE type { $$ = new string(string("ref ").append(*$2)); }
     | NOALIASTYPE REFTYPE type { $$ = new string(string("noalias ref ").append(*$3)); }
     ;
 
@@ -258,7 +260,7 @@ type:
 string type_inference(NExpression *node) {
     switch(node->mark) {
         case 1: {  //variable expression
-            string s_temp = var_type[node->name->name];
+            string s_temp = var_type[((NVariable*)node)->name->name];
             auto found = s_temp.find("ref ");
             if (found != string::npos)
                 s_temp = s_temp.substr(found+4);
@@ -271,16 +273,105 @@ string type_inference(NExpression *node) {
             return "float";
         }
         case 4: {  //call expression
-            return globid_type[node->funcname->name];
+            return globid_type[((NFuncCall*)node)->funcname->name];
         }
         case 5: {  //unary operation expression
-            return type_inference(node->rhs);
+            return type_inference(((NUnaryOperator*)node)->rhs);
         }
         case 6: {  //binary operation expression
-            return type_inference(node->lhs);
+            return type_inference(((NBinaryOperator*)node)->lhs);
         }
         default: {
             return NULL;
         }
     }
 }
+
+int main(int argc, char **argv) {
+    // By default DO NOT print AST tree to stdout uness -emit-ast is provided.
+    bool emit_ast = false;
+    // Only support -O3 optimization level.
+    bool opt = false;
+    string inputfile, outputfile;
+    for (int i = 1; i < argc; ++i) {
+        if (string(argv[i]).compare(string("-emit-ast")) == 0) {
+            emit_ast = true;
+            continue;
+        }
+        if (string(argv[i]).compare(string("-o")) == 0) {
+            if (i == argc - 1) {
+                cout << "Please specify output file after -o option!" << endl;
+                exit(1);
+            }
+            outputfile = string(argv[i + 1]);
+            i += 1;
+            continue;
+        }
+        if (string(argv[i]).compare(string("-O3")) == 0) {
+            opt = true;
+            continue;
+        }
+        if (!inputfile.empty()) {
+            cout << "Ignored redundant command line argument: " << string(argv[i]) << endl;
+        } else {
+            inputfile = string(argv[1]);
+        }
+    }
+    
+    if (inputfile.empty()) {
+        cout << "Please specify an inputfile to parse." << endl;
+        exit(1);
+    }
+    
+    FILE *input = fopen(inputfile.c_str(), "r");
+    // make sure it's valid:
+    if (!input) {
+        cout << "Error while opening inputfile: " << inputfile << endl;
+        exit(1);
+    }
+    
+    cout << "Parsing input ..." << endl;
+    yyin = input;
+    do {
+        yyparse();
+    } while (!feof(yyin));
+    
+    // AST YAML output
+    if (!outputfile.empty()) {
+        cout << "Writing parsed AST tree to outputfile: " << outputfile << endl;
+        if (programBlock != NULL) {
+            ofstream ofs(outputfile);
+            programBlock->yaml_output(ofs, 0);
+        }
+    } else if (emit_ast) {
+        // YAML to stdout
+        if (programBlock != NULL) {
+            programBlock->yaml_output(cout, 0);;
+        }
+    }
+    
+    /*
+     * Code generation
+     */
+    /*InitializeNativeTarget();
+     InitializeNativeTargetAsmPrinter();
+     InitializeNativeTargetAsmParser();
+     CodeGenContext context;
+     context.setOpt(opt);
+     createCoreFunctions(context);
+     context.generateCode(*programBlock);
+     context.printGenCode();
+     // context.runCode();
+     
+     return 0;*/
+    
+    
+    
+    
+    
+    
+    
+    cout << "Done." << endl;
+    return 0;
+}
+
