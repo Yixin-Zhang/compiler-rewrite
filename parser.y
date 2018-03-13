@@ -1,5 +1,6 @@
 %{
   #include "node.h"
+  #include "codegen.h"
   #include <cstdio>
   #include <cstdlib>
   #include <unordered_map>
@@ -7,7 +8,7 @@
 
   // stuff from flex that bison needs to know about:
   extern "C" int yylex();
-  extern "C" int yyparse();
+  extern int yyparse();
   extern "C" void yyerror(const char* s);
   extern "C" FILE *yyin;
   extern int yylineno;
@@ -16,6 +17,7 @@
   unordered_map<string, string> globid_type;  //record the return type of each function
   unordered_map<string, string> var_type;  //record the type of each variable
   
+  void createCoreFunctions(CodeGenContext& context);
   void yyerror(const char *s) {
     fprintf(stderr, "Error | Line: %d, Column: %d: %s\n", yylineno, yycolumn, s);
     exit(1);
@@ -353,22 +355,15 @@ int main(int argc, char **argv) {
     /*
      * Code generation
      */
-    /*InitializeNativeTarget();
-     InitializeNativeTargetAsmPrinter();
-     InitializeNativeTargetAsmParser();
-     CodeGenContext context;
-     context.setOpt(opt);
-     createCoreFunctions(context);
-     context.generateCode(*programBlock);
-     context.printGenCode();
-     // context.runCode();
-     
-     return 0;*/
-    
-    
-    
-    
-    
+    InitializeNativeTarget();
+    InitializeNativeTargetAsmPrinter();
+    InitializeNativeTargetAsmParser();
+    CodeGenContext context;
+    context.setOpt(opt);
+    createCoreFunctions(context);
+    context.generateCode(*programBlock);
+    context.printGenCode();
+    //context.runCode();
     
     
     cout << "Done." << endl;
