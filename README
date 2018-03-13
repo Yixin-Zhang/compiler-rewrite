@@ -17,12 +17,13 @@ We used Bison & Flex to generate our parser and the environment is Mac OS X.
 To generate the parser, simply run 'make' or 'make parser'.
 
 To use the parser to parse your source file, run:
-./parser source-file [ -o outputfile] [-emit-ast]
+./parser source-file [ -o1 outputfile1] [-emit-ast] [-o2 outputfile2]
 
-When -o option is used, the AST will be output to 'outputfile' in YAML format.
+When -o1 option is used, the AST will be output to 'outputfile1' in YAML format.
 When only -emit-ast option is used, AST will be printed to standard output.
 If not options specified, the parser will silently parse the source and check
 any syntax errors, and won't print the output.
+When -o2 option is used, the CodeGen will be output to 'outputfile2'.
 
 Run "make clean" to clean up the intermediate files generated.
 

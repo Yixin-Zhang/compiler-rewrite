@@ -16,6 +16,9 @@ void CodeGenContext::generateCode(NProgram& root) {
     FunctionType *ftype = FunctionType::get(Type::getVoidTy(MyContext), makeArrayRef(argTypes), false);
     mainFunction = Function::Create(ftype, GlobalValue::InternalLinkage, "main", module);
     BasicBlock *bblock = BasicBlock::Create(MyContext, "entry", mainFunction, 0);
+    /*std::vector<Value*> args;
+    ExpressionList::const_iterator it;
+    CallInst *call = CallInst::Create(function, makeArrayRef(args), "", context.currentBlock());*/
     
     /* Push a new variable/block context */
     pushBlock(bblock);
@@ -229,8 +232,8 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context) {
             case OP_LSS: other_instr = Instruction::ICmp; pre = CmpInst::ICMP_SLT; goto cmp;
             case OP_GTR: other_instr = Instruction::ICmp; pre = CmpInst::ICMP_SGT; goto cmp;
         }
-    } /*else if (exp_type == "cint") {
-        std::string op_symbol = new string("");
+    } else if (exp_type == "cint") {
+        /*std::string op_symbol = new string("");
         switch (op) {
             case OP_PLUS: op_symbol += "sadd"; goto cmath;
             case OP_MINUS: op_symbol += "ssub"; goto cmath;
@@ -238,10 +241,8 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context) {
             case OP_DIV: instr = Instruction::SDiv; goto math;
         }
         //we should add some error reporting code here if overflow happens
-        std::string overflow_code = new string("%res = call {i32, i1} @llvm."+op_symbol+".with.overflow.i32(i32 %a, i32 %b)\n%sum = extractvalue {i32, i1} %res, 0\n%obit = extractvalue {i32, i1} %res, 1\nbr i1 %obit, label %overflow, label %normal\noverflow:\n\nlabel:\n");
-        return (Value*) overflow_code;
-       cout << i;
-    }*/
+        return (Value*) overflow_code;*/
+    }
     return NULL;
     
 fmath:
@@ -400,26 +401,26 @@ Value* NIfStatement::codeGen(CodeGenContext& context) {
     /*Value *CondV = exp->codeGen(context);
     if (!CondV) return nullptr;
     
-    //cout << "1111" << endl;
-    CondV = Builder.CreateICmpNE(CondV, Builder.getInt1(0), "ifcond");
+    CondV = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_NE, CondV,
+                                    Builder.getInt1(0), "ifcond", context.currentBlock());
+    //Builder.CreateICmpNE(CondV, Builder.getInt1(0), "ifcond", context.currentBlock());
+    //return CondV1;
     Function *TheFunction = context.currentBlock()->getParent();
     
-    //cout << "2111" << endl;
+    return TheFunction;
     // Create blocks for the then and else cases.  Insert the 'then' block at the
     // end of the function.
     //BasicBlock *ThenBB = BasicBlock::Create(MyContext, "then", TheFunction);
     BasicBlock *ThenBB = BasicBlock::Create(MyContext, "then", TheFunction);
     BasicBlock *ElseBB = BasicBlock::Create(MyContext, "else");
-    BasicBlock *MergeBB = BasicBlock::Create(MyContext, "ifcont");
+    BasicBlock *MergeBB = BasicBlock::Create(MyContext, "ifcon");
     
-    //cout << "3111" << endl;
     Builder.CreateCondBr(CondV, ThenBB, ElseBB);
     
     // Emit then value.
     Builder.SetInsertPoint(ThenBB);
     
     Value *ThenV = stmt->codeGen(context);
-    if (!ThenV) return nullptr;
     
     Builder.CreateBr(MergeBB);
     // codeGen of 'Then' can change the current block, update ThenBB for the PHI.
@@ -430,10 +431,8 @@ Value* NIfStatement::codeGen(CodeGenContext& context) {
     Builder.SetInsertPoint(ElseBB);
     
     Value *ElseV = NULL;
-    if (else_stmt != NULL) {
-        Value *ElseV = else_stmt->codeGen(context);
-        if (!ElseV)
-            return nullptr;
+    if (else_stmt != nullptr) {
+        ElseV = else_stmt->codeGen(context);
     }
     
     Builder.CreateBr(MergeBB);
@@ -443,11 +442,13 @@ Value* NIfStatement::codeGen(CodeGenContext& context) {
     // Emit merge block.
     TheFunction->getBasicBlockList().push_back(MergeBB);
     Builder.SetInsertPoint(MergeBB);
-    //PHINode *PN = Builder.CreatePHI(Type::getInt32Ty(MyContext), 2, "iftmp");
+    
+    //PHINode *PN = PHINode::Create(Type::getInt32Ty(MyContext), 2, "", context.currentBlock());
     
     //PN->addIncoming(ThenV, ThenBB);
     //PN->addIncoming(ElseV, ElseBB);
-    //return PN;
+    return PN;
+    
     return CondV;*/
     
     return NULL;

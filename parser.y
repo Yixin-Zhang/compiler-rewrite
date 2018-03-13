@@ -294,13 +294,13 @@ int main(int argc, char **argv) {
     bool emit_ast = false;
     // Only support -O3 optimization level.
     bool opt = false;
-    string inputfile, outputfile;
+    string inputfile, outputfile, outputfile_codegen;
     for (int i = 1; i < argc; ++i) {
         if (string(argv[i]).compare(string("-emit-ast")) == 0) {
             emit_ast = true;
             continue;
         }
-        if (string(argv[i]).compare(string("-o")) == 0) {
+        if (string(argv[i]).compare(string("-o1")) == 0) {
             if (i == argc - 1) {
                 cout << "Please specify output file after -o option!" << endl;
                 exit(1);
@@ -317,6 +317,15 @@ int main(int argc, char **argv) {
             cout << "Ignored redundant command line argument: " << string(argv[i]) << endl;
         } else {
             inputfile = string(argv[1]);
+        }
+        if (string(argv[i]).compare(string("-o2")) == 0) {
+            if (i == argc - 1) {
+                cout << "Please specify output file after -o option!" << endl;
+                exit(1);
+            }
+            outputfile_codegen = string(argv[i + 1]);
+            i += 1;
+            continue;
         }
     }
     
@@ -363,6 +372,18 @@ int main(int argc, char **argv) {
     createCoreFunctions(context);
     context.generateCode(*programBlock);
     context.printGenCode();
+    if (!outputfile_codegen.empty()) {
+        cout << "Writing generated code to outputfile: " << outputfile_codegen << endl;
+        if (programBlock != NULL) {
+            ofstream ofs(outputfile_codegen);
+            string os;
+            raw_string_ostream ros(os);
+            context.printToFile(ros);
+            auto a = os.find("  ret void\n");
+            os.insert(a, "  call void @run()\n");
+            ofs << os;
+        }
+    }
     //context.runCode();
     
     

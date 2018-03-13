@@ -80,6 +80,10 @@ public:
         module->print(errs(), nullptr);
     };
     
+    void printToFile(raw_ostream &OS) {
+        module->print(OS, nullptr);
+    }
+    
     GenericValue runCode();
 
     std::map<std::string, Value*>& locals() {
@@ -106,7 +110,7 @@ public:
     void popBlock() {
     	CodeGenBlock *top = blocks.top();
     	blocks.pop();
-        delete top;
+        //delete top;
     }
 
     void setCurrentReturnValue(Value *value) {
@@ -121,6 +125,7 @@ public:
         }
         return NULL;
     }
+    
 };
 
 #endif
