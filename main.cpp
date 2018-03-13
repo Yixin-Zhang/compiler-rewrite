@@ -5,9 +5,10 @@
 using namespace std;
 
 extern int yyparse();
-extern NBlock* programBlock;
+extern FILE *yyin;
+extern NProgram* programBlock;
 
-void createCoreFunctions(CodeGenContext& context);
+//void createCoreFunctions(CodeGenContext& context);
 
 int main(int argc, char **argv) {
  	// By default DO NOT print AST tree to stdout uness -emit-ast is provided.
@@ -29,7 +30,7 @@ int main(int argc, char **argv) {
 			i += 1;
 			continue;
 		}
-		if (string(argvp[i].compare(string("-O3"))) == 0) {
+		if (string(argv[i]).compare(string("-O3")) == 0) {
 			opt = true;
 			continue;
 		}
@@ -83,13 +84,7 @@ int main(int argc, char **argv) {
 	createCoreFunctions(context);
 	context.generateCode(*programBlock);	
 	context.printGenCode();
-	// context.runCode();
-	
-	return 0;
-
-
-
-
+	//context.runCode();
 
 
 
