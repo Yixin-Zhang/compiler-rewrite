@@ -27,4 +27,8 @@ When -o2 option is used, the CodeGen will be output to 'outputfile2'.
 
 Run "make clean" to clean up the intermediate files generated.
 
-Since we still didn't finish our final codegen version, we just added the code which is related to cint check to the files. So it may not run well.
+We tried our best to make a complete compiler, however, for this assignment, we
+still didn't finish 3 things:
+1. If statement
+2. While statement
+3. Things related to noalias
