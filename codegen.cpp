@@ -63,21 +63,33 @@ GenericValue CodeGenContext::runCode() {
 
 /* Returns an LLVM type based on the identifier */
 static Type *typeOf(const NIdentifier& type) {
-    if (type.name.compare("int") == 0) {
+    if (type.name.compare("int") == 0 || type.name.compare("cint") == 0) {
         return Type::getInt32Ty(MyContext);
     }
-    else if (type.name.compare("float") == 0) {
+    else if (type.name.compare("float") || type.name.compare("sfloat") == 0) {
         return Type::getFloatTy(MyContext);
+    }
+    else if (type.name.find("ref int") != string::npos || type.name.find("ref cint") != string::npos) {
+        return Type::getInt32PtrTy(MyContext);
+    }
+    else if (type.name.find("ref float") != string::npos || type.name.find("ref sfloat") != string::npos) {
+        return Type::getFloatPtrTy(MyContext);
     }
     return Type::getVoidTy(MyContext);
 }
 
 static Type *typeOf(const string& type) {
-    if (type.compare("int") == 0) {
+    if (type.compare("int") == 0 || type.compare("cint") == 0) {
         return Type::getInt32Ty(MyContext);
     }
-    else if (type.compare("float") == 0) {
+    else if (type.compare("float") == 0 || type.compare("sfloat") == 0) {
         return Type::getFloatTy(MyContext);
+    }
+    else if (type.find("ref int") != string::npos || type.find("ref cint") != string::npos) {
+        return Type::getInt32PtrTy(MyContext);
+    }
+    else if (type.find("ref float") != string::npos || type.find("ref sfloat") != string::npos) {
+        return Type::getFloatPtrTy(MyContext);
     }
     return Type::getVoidTy(MyContext);
 }
@@ -106,7 +118,9 @@ Value* NAssignment_codeGen(CodeGenContext& context, NExpression *hs, NExpression
     }
     Value *assign_gen = rhs->codeGen(context);
     Value *assign_rhs;
-    if (hs->exp_type.find("float") != string::npos) {
+    
+    //deal with type conversion
+    if (lhs->exp_type.find("float") != string::npos) {
         if (rhs->exp_type.find("float") != string::npos)
             assign_rhs = assign_gen;
         else assign_rhs = new SIToFPInst(assign_gen, Type::getFloatTy(context.module->getContext()), "", context.currentBlock());
@@ -115,7 +129,16 @@ Value* NAssignment_codeGen(CodeGenContext& context, NExpression *hs, NExpression
             assign_rhs = assign_gen;
         else assign_rhs = new FPToSIInst(assign_gen, Type::getInt32Ty(context.module->getContext()), "", context.currentBlock());
     }
-    return new StoreInst(assign_rhs, context.locals()[lhs->name->name], false, context.currentBlock());
+    
+    //deal with ref type
+    Value *clhs = assign_rhs;
+    string s_temp = context.locals_type()[((NVariable*)hs)->name->name];
+    if (s_temp.find("ref int") != string::npos || s_temp.find("ref cint") != string::npos || s_temp.find("ref float") != string::npos || s_temp.find("ref sfloat") != string::npos) {
+        clhs = new LoadInst(context.locals()[lhs->name->name], "", context.currentBlock());
+        return new StoreInst(assign_rhs, clhs, false, context.currentBlock());
+    } else return new StoreInst(clhs, context.locals()[lhs->name->name], false, context.currentBlock());
+    
+    return NULL;
 }
 
 Value* NBinaryOperator::codeGen(CodeGenContext& context) {
@@ -129,9 +152,29 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context) {
         case OP_ASSIGN: return NAssignment_codeGen(context, lhs, rhs);
     }
     
-    Value *llhs, *rrhs;
     Value *clhs = lhs->codeGen(context);
     Value *crhs = rhs->codeGen(context);
+    
+    //deal with ref type
+    if (lhs->mark == 1) {
+        string s_temp = context.locals_type()[((NVariable*)lhs)->name->name];
+        if (s_temp.find("ref int") != string::npos || s_temp.find("ref cint") != string::npos) {
+            clhs = new LoadInst(clhs, "", context.currentBlock());
+        } else if (s_temp.find("ref float") != string::npos || s_temp.find("ref sfloat") != string::npos) {
+            clhs = new LoadInst(clhs, "", context.currentBlock());
+        }
+    }
+    if (rhs->mark == 1) {
+        string s_temp = context.locals_type()[((NVariable*)rhs)->name->name];
+        if (s_temp.find("ref int") != string::npos || s_temp.find("ref cint") != string::npos) {
+            crhs = new LoadInst(crhs, "", context.currentBlock());
+        } else if (s_temp.find("ref float") != string::npos || s_temp.find("ref sfloat") != string::npos) {
+            crhs = new LoadInst(crhs, "", context.currentBlock());
+        }
+    }
+    
+    //deal with type conversion
+    Value *llhs, *rrhs;
     if (exp_type.find("float") != string::npos) {
         if (lhs->exp_type.find("float") != string::npos) {
             llhs = clhs;
@@ -197,27 +240,36 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context) {
         //we should add some error reporting code here if overflow happens
         std::string overflow_code = new string("%res = call {i32, i1} @llvm."+op_symbol+".with.overflow.i32(i32 %a, i32 %b)\n%sum = extractvalue {i32, i1} %res, 0\n%obit = extractvalue {i32, i1} %res, 1\nbr i1 %obit, label %overflow, label %normal\noverflow:\n\nlabel:\n");
         return (Value*) overflow_code;
+       cout << i;
     }*/
     return NULL;
+    
 fmath:
-{   BinaryOperator *v = BinaryOperator::Create(instr, llhs,
+{
+    //deal with fast math for float type
+    BinaryOperator *v = BinaryOperator::Create(instr, llhs,
                                   rrhs, "", context.currentBlock());
     FastMathFlags FMF;
     FMF.setUnsafeAlgebra();
     v->setFastMathFlags(FMF);
     return v;
 }
+    
 math:
     return BinaryOperator::Create(instr, llhs,
                                   rrhs, "", context.currentBlock());
+    
 fcmp:
-{   CmpInst *v = CmpInst::Create(other_instr, pre, llhs,
+{
+    //deal with fast math for float type
+    CmpInst *v = CmpInst::Create(other_instr, pre, llhs,
                                      rrhs, "", context.currentBlock());
     FastMathFlags FMF;
     FMF.setUnsafeAlgebra();
     v->setFastMathFlags(FMF);
     return v;
 }
+    
 cmp:
     return CmpInst::Create(other_instr, pre, llhs,
                                   rrhs, "", context.currentBlock());
@@ -340,6 +392,7 @@ Value* NVariableDeclaration::codeGen(CodeGenContext& context) {
     std::cout << "Creating variable declaration " << type << " " << var->name->name << endl;
     AllocaInst *alloc = new AllocaInst(typeOf(type), 0, var->name->name.c_str(), context.currentBlock());
     context.locals()[var->name->name] = alloc;
+    context.locals_type()[var->name->name] = type;
     return alloc;
 }
 
