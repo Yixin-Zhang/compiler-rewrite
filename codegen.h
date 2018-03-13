@@ -48,6 +48,7 @@ public:
     BasicBlock *block;
     Value *returnValue;
     std::map<std::string, Value*> locals;
+    std::map<std::string, std::string> locals_type;
 };
 
 class CodeGenContext {
@@ -83,6 +84,10 @@ public:
 
     std::map<std::string, Value*>& locals() {
         return blocks.top()->locals ;
+    }
+    
+    std::map<std::string, std::string>& locals_type() {
+        return blocks.top()->locals_type ;
     }
     
     BasicBlock *currentBlock() {
