@@ -19,6 +19,8 @@
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/ExecutionEngine/GenericValue.h>
+#include <llvm/ExecutionEngine/Interpreter.h>
+#include <llvm/ExecutionEngine/MCJIT.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
@@ -55,6 +57,7 @@ class CodeGenContext {
     std::stack<CodeGenBlock *> blocks;
     Function *mainFunction;
     bool opt;
+    bool jit;
 
 public:
     Module *module;
@@ -62,6 +65,7 @@ public:
     CodeGenContext() {
         module = new Module("main", MyContext);
         opt = false;
+        jit = false;
     }
 
     void setOpt(bool to_opt) {
@@ -70,6 +74,14 @@ public:
 
     bool getOpt() {
         return opt;
+    }
+
+    void setJit(bool to_jit) {
+        jit = to_jit;
+    }
+
+    bool getJit() {
+        return jit;
     }
 
     void generateCode(NProgram& root);

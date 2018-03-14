@@ -16,6 +16,7 @@ int main(int argc, char **argv) {
 	bool emit_ast = false;
 	// Only support -O3 optimization level.
 	bool opt = false;
+	bool jit = false;
 	string inputfile, outputfile;
 	for (int i = 1; i < argc; ++i) {
 		if (string(argv[i]).compare(string("-emit-ast")) == 0) {
@@ -31,8 +32,12 @@ int main(int argc, char **argv) {
 			i += 1;
 			continue;
 		}
-		if (string(argv[i]).compare(string("-O3")) == 0) {
+		if (string(argv[i]).compare(string("-O")) == 0) {
 			opt = true;
+			continue;
+		}
+		if (string(argv[i]).compare(string("-jit")) == 0) {
+			jit = true;
 			continue;
 		}
 		if (!inputfile.empty()) {
@@ -82,6 +87,7 @@ int main(int argc, char **argv) {
 	InitializeNativeTargetAsmParser();
 	CodeGenContext context;
 	context.setOpt(opt);
+	context.setJit(jit);
 	createCoreFunctions(context);
 	context.generateCode(*programBlock);	
 	context.printGenCode();

@@ -50,17 +50,34 @@ void CodeGenContext::generateCode(NProgram& root) {
         builder.SLPVectorize = true;
         builder.populateModulePassManager(*pm);
         pm->run(*module);
+        delete pm;
     }
 }
 
 /* Executes the AST by running the main function */
 GenericValue CodeGenContext::runCode() {
-    std::cout << "Running code...\n";
-    ExecutionEngine *ee = EngineBuilder( unique_ptr<Module>(module) ).create();
-    ee->finalizeObject();
+    std::cout << (getJit() ? "JIT " : "") << "Running code...\n";
     vector<GenericValue> noargs;
-    GenericValue v = ee->runFunction(mainFunction, noargs);
-    std::cout << "Code was run.\n";
+    Function* TheRunF = cast<Function>(module->getFunction("run"));
+    if (TheRunF == NULL) {
+        cout << "run() does not exist!" << endl;
+    }
+    std::string err;
+    EngineBuilder* eb = new EngineBuilder(unique_ptr<Module>(module));
+    if (getJit()) {
+
+        eb->setEngineKind(llvm::EngineKind::JIT).setErrorStr(&err);
+    }
+    ExecutionEngine *ee = eb->create();
+
+    if (!ee) {
+        cout << "Error while creating ExecutionEngine in runCode()!" << endl;
+    }
+    // GenericValue v = ee->runFunction(mainFunction, noargs);  // this is wrong!
+    ee->finalizeObject();
+    GenericValue v = ee->runFunction(TheRunF, noargs);
+    std::cout << "\nCode was run.\n";
+    // std::cout << "Result: " << v.IntVal << std::endl;
     return v;
 }
 
