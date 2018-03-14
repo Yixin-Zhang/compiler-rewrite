@@ -1,6 +1,5 @@
 #include <iostream>
 #include "codegen.h"
-#include "corefn.h"
 #include "node.h"
 
 using namespace std;
@@ -9,7 +8,7 @@ extern int yyparse();
 extern FILE *yyin;
 extern NProgram* programBlock;
 
-//void createCoreFunctions(CodeGenContext& context);
+void createCoreFunctions(CodeGenContext& context);
 
 int main(int argc, char **argv) {
  	// By default DO NOT print AST tree to stdout uness -emit-ast is provided.
@@ -17,13 +16,13 @@ int main(int argc, char **argv) {
 	// Only support -O3 optimization level.
 	bool opt = false;
 	bool jit = false;
-	string inputfile, outputfile;
+	string inputfile, outputfile, outputfile_codegen;
 	for (int i = 1; i < argc; ++i) {
 		if (string(argv[i]).compare(string("-emit-ast")) == 0) {
 			emit_ast = true;
 			continue;
 		}
-		if (string(argv[i]).compare(string("-o")) == 0) {
+		if (string(argv[i]).compare(string("-o1")) == 0) {
 			if (i == argc - 1) {
 				cout << "Please specify output file after -o option!" << endl;
 				exit(1);
@@ -45,6 +44,15 @@ int main(int argc, char **argv) {
 		} else {
 			inputfile = string(argv[i]);
 		}
+        if (string(argv[i]).compare(string("-o2")) == 0) {
+            if (i == argc - 1) {
+                cout << "Please specify output file after -o option!" << endl;
+                exit(1);
+            }
+            outputfile_codegen = string(argv[i + 1]);
+            i += 1;
+            continue;
+        }
 	}
 
 	if (inputfile.empty()) {
@@ -91,8 +99,19 @@ int main(int argc, char **argv) {
 	createCoreFunctions(context);
 	context.generateCode(*programBlock);	
 	context.printGenCode();
-
-	context.runCode();
+    if (!outputfile_codegen.empty()) {
+        cout << "Writing generated code to outputfile: " << outputfile_codegen << endl;
+        if (programBlock != NULL) {
+            ofstream ofs(outputfile_codegen);
+            string os;
+            raw_string_ostream ros(os);
+            context.printToFile(ros);
+            auto a = os.find("  ret void\n");
+            os.insert(a, "  call void @run()\n");
+            ofs << os;
+        }
+    }
+	//context.runCode();
 
 	cout << "Done." << endl;
 	return 0;

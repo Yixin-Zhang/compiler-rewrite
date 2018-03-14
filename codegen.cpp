@@ -1,11 +1,7 @@
-#include "node.h"
 #include "codegen.h"
 #include "parser.hpp"
-#include "corefn.h"
 
 using namespace llvm;
-
-//extern Function* printfFn;
 
 /* Compile the AST into a module */
 void CodeGenContext::generateCode(NProgram& root) {
@@ -29,10 +25,10 @@ void CodeGenContext::generateCode(NProgram& root) {
     /* Print the bytecode in a human-readable format
      to see if our program compiled properly
      */
-     std::cout << "Code is generated.\n";
+    std::cout << "Code is generated.\n";
     // module->dump();
 
-     if (getOpt()) {
+    if (getOpt()) {
         std::cout << "Running optimization...\n";
         // legacy::PassManager pm;
         // pm.add(createPrintModulePass(outs()));
@@ -121,7 +117,7 @@ Value* NIdentifier::codeGen(CodeGenContext& context) {
         std::cerr << "undeclared variable " << name << endl;
         return NULL;
     }
-    return new LoadInst(context.locals()[name], "", false, context.currentBlock());
+    return Builder.CreateLoad(context.locals()[name], "");
 }
 
 Value* NVariable::codeGen(CodeGenContext& context) {
@@ -129,9 +125,8 @@ Value* NVariable::codeGen(CodeGenContext& context) {
     return name->codeGen(context);
 }
 
-Value* NAssignment_codeGen(CodeGenContext& context, NVariable *hs, NExpression *rhs) {
+Value* NAssignment_codeGen(CodeGenContext& context, NExpression *hs, NExpression *rhs) {
     std::cout << "Creating assignment... " << endl;
-    cout << "type: lhs=" << hs->exp_type << ", rhs=" << rhs->exp_type << endl;
     NVariable *lhs = (NVariable *)hs;
     if (context.locals().find(lhs->name->name) == context.locals().end()) {
         std::cerr << "undeclared variable " << lhs->name->name << endl;
@@ -141,24 +136,23 @@ Value* NAssignment_codeGen(CodeGenContext& context, NVariable *hs, NExpression *
     Value *assign_rhs;
     
     //deal with type conversion
-    // cout << "type: lhs=" << lhs->exp_type << ", rhs=" << rhs->exp_type << endl;
     if (lhs->exp_type.find("float") != string::npos) {
         if (rhs->exp_type.find("float") != string::npos)
             assign_rhs = assign_gen;
-        else assign_rhs = new SIToFPInst(assign_gen, Type::getFloatTy(context.module->getContext()), "", context.currentBlock());
-    } else {
+        else assign_rhs = Builder.CreateSIToFP(assign_gen, Type::getFloatTy(context.module->getContext()), "");
+    } else if (lhs->exp_type.find("int") != string::npos) {
         if (rhs->exp_type.find("int") != string::npos)
             assign_rhs = assign_gen;
-        else assign_rhs = new FPToSIInst(assign_gen, Type::getInt32Ty(context.module->getContext()), "", context.currentBlock());
-    }
+        else assign_rhs = Builder.CreateFPToSI(assign_gen, Type::getInt32Ty(context.module->getContext()), "");
+    } else assign_rhs = assign_gen;
     
     //deal with ref type
     Value *clhs = assign_rhs;
     string s_temp = context.locals_type()[((NVariable*)hs)->name->name];
     if (s_temp.find("ref int") != string::npos || s_temp.find("ref cint") != string::npos || s_temp.find("ref float") != string::npos || s_temp.find("ref sfloat") != string::npos) {
-        clhs = new LoadInst(context.locals()[lhs->name->name], "", context.currentBlock());
-        return new StoreInst(assign_rhs, clhs, false, context.currentBlock());
-    } else return new StoreInst(clhs, context.locals()[lhs->name->name], false, context.currentBlock());
+        clhs = Builder.CreateLoad(context.locals()[lhs->name->name], "");
+        return Builder.CreateStore(assign_rhs, clhs);
+    } else return Builder.CreateStore(clhs, context.locals()[lhs->name->name]);
     
     return NULL;
 }
@@ -169,9 +163,9 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context) {
     Instruction::OtherOps other_instr;
     CmpInst::Predicate pre;
     switch (op) {
-        case OP_AND: instr = Instruction::And; return BinaryOperator::Create(instr, lhs->codeGen(context), rhs->codeGen(context), "", context.currentBlock());
-        case OP_OR: instr = Instruction::Or; return BinaryOperator::Create(instr, lhs->codeGen(context), rhs->codeGen(context), "", context.currentBlock());
-        case OP_ASSIGN: return NAssignment_codeGen(context, (NVariable*)lhs, rhs);
+        case OP_AND: instr = Instruction::And; return Builder.CreateAnd(lhs->codeGen(context), rhs->codeGen(context), "");
+        case OP_OR: instr = Instruction::Or; return Builder.CreateOr(lhs->codeGen(context), rhs->codeGen(context), "");
+        case OP_ASSIGN: return NAssignment_codeGen(context, lhs, rhs);
     }
     
     Value *clhs = lhs->codeGen(context);
@@ -181,17 +175,17 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context) {
     if (lhs->mark == 1) {
         string s_temp = context.locals_type()[((NVariable*)lhs)->name->name];
         if (s_temp.find("ref int") != string::npos || s_temp.find("ref cint") != string::npos) {
-            clhs = new LoadInst(clhs, "", context.currentBlock());
+            clhs = Builder.CreateLoad(clhs, "");
         } else if (s_temp.find("ref float") != string::npos || s_temp.find("ref sfloat") != string::npos) {
-            clhs = new LoadInst(clhs, "", context.currentBlock());
+            clhs = Builder.CreateLoad(clhs, "");
         }
     }
     if (rhs->mark == 1) {
         string s_temp = context.locals_type()[((NVariable*)rhs)->name->name];
         if (s_temp.find("ref int") != string::npos || s_temp.find("ref cint") != string::npos) {
-            crhs = new LoadInst(crhs, "", context.currentBlock());
+            crhs = Builder.CreateLoad(crhs, "");
         } else if (s_temp.find("ref float") != string::npos || s_temp.find("ref sfloat") != string::npos) {
-            crhs = new LoadInst(crhs, "", context.currentBlock());
+            crhs = Builder.CreateLoad(crhs, "");
         }
     }
     
@@ -201,98 +195,87 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context) {
         if (lhs->exp_type.find("float") != string::npos) {
             llhs = clhs;
         } else {
-            llhs = new SIToFPInst(clhs, Type::getFloatTy(context.module->getContext()), "", context.currentBlock());
+            llhs = Builder.CreateSIToFP(clhs, Type::getFloatTy(context.module->getContext()), "");
         }
         if (rhs->exp_type.find("float") != string::npos) {
             rrhs = crhs;
         } else {
-            rrhs = new SIToFPInst(crhs, Type::getFloatTy(context.module->getContext()), "", context.currentBlock());
+            rrhs = Builder.CreateSIToFP(crhs, Type::getFloatTy(context.module->getContext()), "");
         }
     } else if (exp_type.find("int") != string::npos) {
         if (lhs->exp_type.find("int") != string::npos) {
             llhs = clhs;
         } else {
-            llhs = new FPToSIInst(clhs, Type::getInt32Ty(context.module->getContext()), "", context.currentBlock());
+            llhs = Builder.CreateFPToSI(clhs, Type::getInt32Ty(context.module->getContext()), "");
         }
         if (rhs->exp_type.find("int") != string::npos) {
             rrhs = crhs;
         } else {
-            rrhs = new FPToSIInst(crhs, Type::getInt32Ty(context.module->getContext()), "", context.currentBlock());
+            rrhs = Builder.CreateFPToSI(crhs, Type::getInt32Ty(context.module->getContext()), "");
         }
+    } else {
+        llhs = clhs;
+        rrhs = crhs;
     }
     
-    if (exp_type == "float") {
+    Value *v;
+    if (exp_type == "float" || exp_type == "sfloat") {
         switch (op) {
-            case OP_PLUS: instr = Instruction::FAdd; goto fmath;
-            case OP_MINUS: instr = Instruction::FSub; goto fmath;
-            case OP_TIMES: instr = Instruction::FMul; goto fmath;
-            case OP_DIV: instr = Instruction::FDiv; goto fmath;
-            case OP_EQL: other_instr = Instruction::FCmp; pre = CmpInst::FCMP_OEQ; goto fcmp;
-            case OP_LSS: other_instr = Instruction::FCmp; pre = CmpInst::FCMP_OLT; goto fcmp;
-            case OP_GTR: other_instr = Instruction::FCmp; pre = CmpInst::FCMP_OGT; goto fcmp;
+            case OP_PLUS: v = Builder.CreateFAdd(llhs, rrhs, ""); break;
+            case OP_MINUS: v = Builder.CreateFSub(llhs, rrhs, ""); break;
+            case OP_TIMES: v = Builder.CreateFMul(llhs, rrhs, ""); break;
+            case OP_DIV: v = Builder.CreateFDiv(llhs, rrhs, ""); break;
+            case OP_EQL: v = Builder.CreateFCmpOEQ(llhs, rrhs, ""); break;
+            case OP_LSS: v = Builder.CreateFCmpOLT(llhs, rrhs, ""); break;
+            case OP_GTR: v = Builder.CreateFCmpOGT(llhs, rrhs, ""); break;
         }
-    } else if (exp_type == "sfloat") {
+        if (exp_type == "float") {
+            //deal with fast math for float type
+            FastMathFlags FMF;
+            FMF.setUnsafeAlgebra();
+            ((BinaryOperator *)v)->setFastMathFlags(FMF);
+        }
+        return v;
+    } else if (exp_type == "int" || exp_type == "cint") {
         switch (op) {
-            case OP_PLUS: instr = Instruction::FAdd; goto math;
-            case OP_MINUS: instr = Instruction::FSub; goto math;
-            case OP_TIMES: instr = Instruction::FMul; goto math;
-            case OP_DIV: instr = Instruction::FDiv; goto math;
-            case OP_EQL: other_instr = Instruction::FCmp; pre = CmpInst::FCMP_OEQ; goto cmp;
-            case OP_LSS: other_instr = Instruction::FCmp; pre = CmpInst::FCMP_OLT; goto cmp;
-            case OP_GTR: other_instr = Instruction::FCmp; pre = CmpInst::FCMP_OGT; goto cmp;
+            case OP_EQL: return Builder.CreateICmpEQ(llhs, rrhs, "");
+            case OP_LSS: return Builder.CreateICmpSLT(llhs, rrhs, "");
+            case OP_GTR: return Builder.CreateICmpSGT(llhs, rrhs, "");
         }
-    } else if (exp_type == "int") {
-        switch (op) {
-            case OP_PLUS: instr = Instruction::Add; goto math;
-            case OP_MINUS: instr = Instruction::Sub; goto math;
-            case OP_TIMES: instr = Instruction::Mul; goto math;
-            case OP_DIV: instr = Instruction::SDiv; goto math;
-            case OP_EQL: other_instr = Instruction::ICmp; pre = CmpInst::ICMP_EQ; goto cmp;
-            case OP_LSS: other_instr = Instruction::ICmp; pre = CmpInst::ICMP_SLT; goto cmp;
-            case OP_GTR: other_instr = Instruction::ICmp; pre = CmpInst::ICMP_SGT; goto cmp;
+        if (exp_type == "int") {
+            switch (op) {
+                case OP_PLUS: return Builder.CreateAdd(llhs, rrhs, "");
+                case OP_MINUS: return Builder.CreateSub(llhs, rrhs, "");
+                case OP_TIMES: return Builder.CreateMul(llhs, rrhs, "");
+                case OP_DIV: return Builder.CreateSDiv(llhs, rrhs, "");
+            }
+        }  else if (exp_type == "cint") {
+            std::string op_symbol;
+            switch (op) {
+                case OP_PLUS: op_symbol += "sadd"; goto cmath;
+                case OP_MINUS: op_symbol += "ssub"; goto cmath;
+                case OP_TIMES: op_symbol += "smul"; goto cmath;
+                case OP_DIV: instr = Instruction::SDiv; goto cmath;
+            }
+            //we should add some error reporting code here if overflow happens
         }
-    } else if (exp_type == "cint") {
-        /*std::string op_symbol = new string("");
-        switch (op) {
-            case OP_PLUS: op_symbol += "sadd"; goto cmath;
-            case OP_MINUS: op_symbol += "ssub"; goto cmath;
-            case OP_TIMES: op_symbol += "smul"; goto cmath;
-            case OP_DIV: instr = Instruction::SDiv; goto math;
-        }
-        //we should add some error reporting code here if overflow happens
-        return (Value*) overflow_code;*/
     }
     return NULL;
-    
-    fmath:
+cmath:
     {
-    //deal with fast math for float type
-        BinaryOperator *v = BinaryOperator::Create(instr, llhs,
-          rrhs, "", context.currentBlock());
-        FastMathFlags FMF;
-        FMF.setUnsafeAlgebra();
-        v->setFastMathFlags(FMF);
-        return v;
+        Module *M = context.module;
+        Value *F = Intrinsic::getDeclaration(M, Intrinsic::sadd_with_overflow, Type::getInt32Ty(MyContext));
+        auto *SAddWithOverflow = CallInst::Create(F, {llhs, rrhs}, "t", context.currentBlock());
+        auto *UAdd = ExtractValueInst::Create(SAddWithOverflow, 0, "sum", context.currentBlock());
+        auto *Overflow = ExtractValueInst::Create(SAddWithOverflow, 1, "obit", context.currentBlock());
+        BasicBlock *ThenBB = BasicBlock::Create(MyContext, "sum");
+        BasicBlock *ElseBB = BasicBlock::Create(MyContext, "obit");
+        BasicBlock *MergeBB = BasicBlock::Create(MyContext, "ifcon");
+        
+        Builder.CreateCondBr(Overflow, ThenBB, ElseBB);
+        //auto ConBr = (Type::getInt32Ty(MyContext), Instruction::Br, );
+        return SAddWithOverflow;
     }
-    
-    math:
-    return BinaryOperator::Create(instr, llhs,
-      rrhs, "", context.currentBlock());
-    
-    fcmp:
-    {
-    //deal with fast math for float type
-        CmpInst *v = CmpInst::Create(other_instr, pre, llhs,
-         rrhs, "", context.currentBlock());
-        FastMathFlags FMF;
-        FMF.setUnsafeAlgebra();
-        v->setFastMathFlags(FMF);
-        return v;
-    }
-    
-    cmp:
-    return CmpInst::Create(other_instr, pre, llhs,
-      rrhs, "", context.currentBlock());
 }
 
 Value* NUnaryOperator::codeGen(CodeGenContext& context) {
@@ -302,7 +285,7 @@ Value* NUnaryOperator::codeGen(CodeGenContext& context) {
     if (op == OP_MINUS) {
         return b_zero->codeGen(context);
     } else if (op == OP_NOT) {
-        return BinaryOperator::CreateNot(rhs->codeGen(context), "", context.currentBlock());
+        return Builder.CreateNot(rhs->codeGen(context), "");
     }
     std::cout << "Invalid unary operation!" << endl;
     return NULL;
@@ -346,7 +329,7 @@ Value* NFuncCall::codeGen(CodeGenContext& context) {
     for (it = (exps->exps).begin(); it != (exps->exps).end(); it++) {
         args.push_back((**it).codeGen(context));
     }
-    CallInst *call = CallInst::Create(function, makeArrayRef(args), "", context.currentBlock());
+    CallInst *call = Builder.CreateCall(function, makeArrayRef(args), "");
     std::cout << "Created method call: " << funcname->name << endl;
     return call;
 }
@@ -375,6 +358,7 @@ Value* NFunctionDeclaration::codeGen(CodeGenContext& context) {
     BasicBlock *bblock = BasicBlock::Create(MyContext, "entry", function, 0);
 
     context.pushBlock(bblock);
+    Builder.SetInsertPoint(bblock);  //add here to reset the insert point
 
     Function::arg_iterator argsValues = function->arg_begin();
     Value* argumentValue;
@@ -384,12 +368,12 @@ Value* NFunctionDeclaration::codeGen(CodeGenContext& context) {
             (**it).codeGen(context);
             argumentValue = &*argsValues++;
             argumentValue->setName((*it)->var->name->name.c_str());
-            StoreInst *inst = new StoreInst(argumentValue, context.locals()[(*it)->var->name->name], false, bblock);
+            StoreInst *inst = Builder.CreateStore(argumentValue, context.locals()[(*it)->var->name->name]);
         }
     }
 
     block->codeGen(context);
-    ReturnInst::Create(MyContext, context.getCurrentReturnValue(), bblock);
+    Builder.CreateRet(context.getCurrentReturnValue());
     
     context.popBlock();
     std::cout << "Created function: " << globid->name << endl;
@@ -410,7 +394,7 @@ Value* NExternDeclaration::codeGen(CodeGenContext& context) {
 
 Value* NVariableDeclaration::codeGen(CodeGenContext& context) {
     std::cout << "Creating variable declaration " << type << " " << var->name->name << endl;
-    AllocaInst *alloc = new AllocaInst(typeOf(type), 0, var->name->name.c_str(), context.currentBlock());
+    AllocaInst *alloc = Builder.CreateAlloca(typeOf(type), 0, var->name->name.c_str());
     context.locals()[var->name->name] = alloc;
     context.locals_type()[var->name->name] = type;
     return alloc;
@@ -418,91 +402,114 @@ Value* NVariableDeclaration::codeGen(CodeGenContext& context) {
 
 Value* NIfStatement::codeGen(CodeGenContext& context) {
     Value *CondV = exp->codeGen(context);
-    if (!CondV)
-       return nullptr;
-
-    // Convert condition to a bool by comparing non-equal to 0.0.
-    CondV = Builder.CreateFCmpONE(CondV, ConstantFP::get(MyContext, APFloat(0.0)), "ifcond");
-
-    Function *TheFunction = Builder.GetInsertBlock()->getParent();
-
+    if (!CondV) return nullptr;
+    
+    //CondV = Builder.CreateFCmpONE(CondV, ConstantFP::get(MyContext, APFloat(0.0)), "ifcond");
+    CondV = Builder.CreateICmpNE(CondV, Builder.getInt1(0), "");
+    //CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_NE, CondV, Builder.getInt1(0), "ifcond", context.currentBlock());
+    Function *TheFunction = context.currentBlock()->getParent();
+    
     // Create blocks for the then and else cases.  Insert the 'then' block at the
     // end of the function.
-    BasicBlock *ThenBB =
-    BasicBlock::Create(MyContext, "then", TheFunction);
+    BasicBlock *ThenBB = BasicBlock::Create(MyContext, "then", TheFunction);
     BasicBlock *ElseBB = BasicBlock::Create(MyContext, "else");
-    BasicBlock *MergeBB = BasicBlock::Create(MyContext, "ifcont");
-
+    BasicBlock *MergeBB = BasicBlock::Create(MyContext, "ifcon");
+    
     Builder.CreateCondBr(CondV, ThenBB, ElseBB);
-
+    
     // Emit then value.
     Builder.SetInsertPoint(ThenBB);
-
+    
     Value *ThenV = stmt->codeGen(context);
-    if (!ThenV)
-      return nullptr;
-
+    
     Builder.CreateBr(MergeBB);
-    // Codegen of 'Then' can change the current block, update ThenBB for the PHI.
+    // codeGen of 'Then' can change the current block, update ThenBB for the PHI.
     ThenBB = Builder.GetInsertBlock();
-
+    
     // Emit else block.
     TheFunction->getBasicBlockList().push_back(ElseBB);
     Builder.SetInsertPoint(ElseBB);
-
-    Value *ElseV = else_stmt->codeGen(context);
-    if (!ElseV)
-      return nullptr;
-
+    
+    Value *ElseV = NULL;
+    if (else_stmt != nullptr) {
+        ElseV = else_stmt->codeGen(context);
+    }
+    
     Builder.CreateBr(MergeBB);
-    // codegen of 'Else' can change the current block, update ElseBB for the PHI.
+    // codeGen of 'Else' can change the current block, update ElseBB for the PHI.
     ElseBB = Builder.GetInsertBlock();
-
+    
     // Emit merge block.
     TheFunction->getBasicBlockList().push_back(MergeBB);
     Builder.SetInsertPoint(MergeBB);
-    PHINode *PN =
-    Builder.CreatePHI(Type::getDoubleTy(MyContext), 2, "iftmp");
-
+    
+    /*PHINode *PN = PHINode::Create(Type::getInt32Ty(MyContext), 2, "", context.currentBlock());
     PN->addIncoming(ThenV, ThenBB);
     PN->addIncoming(ElseV, ElseBB);
-    return PN;
+    return PN;*/
+    
+    //return CondV;
+    return NULL;
 }
 
 Value* NWhileStatement::codeGen(CodeGenContext& context) {
+    Function *TheFunction = context.currentBlock()->getParent();
+    
+    // Create blocks for the then and else cases.  Insert the 'while condition' block at the
+    // end of the function.
+    BasicBlock *CondBB = BasicBlock::Create(MyContext, "whilecond", TheFunction);
+    BasicBlock *ThenBB = BasicBlock::Create(MyContext, "loop");
+    BasicBlock *MergeBB = BasicBlock::Create(MyContext, "whilecon");
+    
+    Builder.CreateBr(CondBB);
+    
+    Builder.SetInsertPoint(CondBB);
+    Value *CondV = exp->codeGen(context);
+    Builder.CreateCondBr(CondV, ThenBB, MergeBB);
+    
+    // Emit then value
+    TheFunction->getBasicBlockList().push_back(ThenBB);
+    Builder.SetInsertPoint(ThenBB);
+    Value *ThenV = stmt->codeGen(context);
+    
+    Builder.CreateBr(CondBB);
+    // codeGen of 'Then' can change the current block, update ThenBB.
+    ThenBB = Builder.GetInsertBlock();
+    
+    // Emit merge block.
+    TheFunction->getBasicBlockList().push_back(MergeBB);
+    Builder.SetInsertPoint(MergeBB);
     return NULL;
 }
 
 Value* NPrintExpressionStatement::codeGen(CodeGenContext& context) {
     Function *function = context.module->getFunction("printf");
     
-    IRBuilder <> builder(context.module->getContext());
-    builder.SetInsertPoint(context.currentBlock());
+    //Builder.SetInsertPoint(context.currentBlock());
     
     Value *str;
     if (exp->exp_type.find("int") != string::npos)
-        str = builder.CreateGlobalStringPtr("%d");
-    else str = builder.CreateGlobalStringPtr("%f");
+        str = Builder.CreateGlobalStringPtr("%d");
+    else str = Builder.CreateGlobalStringPtr("%f");
     std::vector <Value *> int32_call_params;
     int32_call_params.push_back(str);
     
     int32_call_params.push_back(exp->codeGen(context));
-    CallInst *call = CallInst::Create(function, int32_call_params, "", context.currentBlock());
+    CallInst *call = Builder.CreateCall(function, int32_call_params, "");
     return call;
 }
 
 Value* NPrintSlitStatement::codeGen(CodeGenContext& context) {
     Function *function = context.module->getFunction("printf");
     
-    IRBuilder <> builder(context.module->getContext());
-    builder.SetInsertPoint(context.currentBlock());
+    //Builder.SetInsertPoint(context.currentBlock());
     
     string s_temp = slit.substr(1, slit.size() - 2);
-    Value *str = builder.CreateGlobalStringPtr(s_temp);
+    Value *str = Builder.CreateGlobalStringPtr(s_temp);
     std::vector <Value *> int32_call_params;
     int32_call_params.push_back(str);
     
-    CallInst *call = CallInst::Create(function, int32_call_params, "", context.currentBlock());
+    CallInst *call = Builder.CreateCall(function, int32_call_params, "");
     return call;
 }
 

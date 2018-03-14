@@ -59,7 +59,7 @@ int yycolumn = 1;
 #[^\n]*\n  		 ;  // Ignore comments
 [ \t\n]          ;  // Ignore spaces
 [0-9]+					    {SAVE_TOKEN; return INTEGER;}
-[0-9]+\.[0-9]* 			    {SAVE_TOKEN; return DOUBLE;}
+[0-9]+\.[0-9]+ 			    {SAVE_TOKEN; return DOUBLE;}
 [a-zA-Z_][a-zA-Z0-9_]*  	{SAVE_TOKEN; return IDENTIFIER;}
 \"[^"]*\"         			{SAVE_TOKEN; return STRING;}
 .                ;

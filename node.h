@@ -58,7 +58,7 @@ public:
     std::string exp_type;
     int mark;
     //for variable, mark = 1; for int, mark = 2; for float, mark = 3; for call, mark = 4; for unary operation, mark = 5; for binary operation, mark = 6.
- 
+    
     NExpression(string exp_type_name, int mark_number) {
         exp_type = exp_type_name;
         mark = mark_number;
@@ -82,7 +82,6 @@ public:
 	NIdentifier* name;
     NVariable(NIdentifier* ident_name, string exp_type_name) : NExpression(exp_type_name, 1) {
         name = ident_name;
-        cout << "Creating a new variable: " << ident_name << ", type = " << exp_type << endl;
     }
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 	virtual void yaml_output(ostream& os, int indent = 0);

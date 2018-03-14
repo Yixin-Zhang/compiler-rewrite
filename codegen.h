@@ -30,8 +30,6 @@
 
 using namespace llvm;
 
-class NBlock;
-
 static LLVMContext MyContext;
 static IRBuilder<> Builder(MyContext);
 
