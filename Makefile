@@ -13,12 +13,14 @@ all: parser
 OBJS = parser.o  \
        tokens.o  \
        codegen.o \
-       yaml.o
+       yaml.o \
+       main.o \
+       corefn.o
 
 LLVMPATH=~/llvm
 LLVMCONFIG =$(LLVMPATH)/bin/llvm-config
 
-CPPFLAGS=-std=c++11 -Wno-deprecated-register `$(LLVMCONFIG) --cppflags`
+CPPFLAGS=-std=c++11 -g -Wno-deprecated-register `$(LLVMCONFIG) --cppflags`
 LDFLAGS=-ll `$(LLVMCONFIG) --ldflags` -lpthread -ldl -lz -lncurses -rdynamic
 LIBS = `$(LLVMCONFIG) --libs`
 INCLUDES=-I$(LLVMPATH)/include

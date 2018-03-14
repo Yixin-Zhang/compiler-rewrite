@@ -1,5 +1,6 @@
 #include <iostream>
 #include "codegen.h"
+#include "corefn.h"
 #include "node.h"
 
 using namespace std;
@@ -37,7 +38,7 @@ int main(int argc, char **argv) {
 		if (!inputfile.empty()) {
 			cout << "Ignored redundant command line argument: " << string(argv[i]) << endl;
 		} else {
-			inputfile = string(argv[1]);
+			inputfile = string(argv[i]);
 		}
 	}
 
@@ -84,9 +85,8 @@ int main(int argc, char **argv) {
 	createCoreFunctions(context);
 	context.generateCode(*programBlock);	
 	context.printGenCode();
-	//context.runCode();
 
-
+	context.runCode();
 
 	cout << "Done." << endl;
 	return 0;

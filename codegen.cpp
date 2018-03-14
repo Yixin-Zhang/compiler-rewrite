@@ -524,7 +524,12 @@ Value* NFuncList::codeGen(CodeGenContext& context) {
 }
 
 Value* NProgram::codeGen(CodeGenContext& context) {
-    externs->codeGen(context);
+    if (externs != NULL) {
+        externs->codeGen(context);
+    }
+    if (funcs == NULL) {
+        cout << "Program has no functions!\n";
+    }
     funcs->codeGen(context);
     return NULL;
 }
