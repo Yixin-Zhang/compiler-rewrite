@@ -4,7 +4,7 @@ Members:
 
 *****************************************************************************
 NOTE: We put our llvm source code under user home directory (in Makefile we
-have LLVMPATH=~/llvm, if your LLVM is in different directories, please change
+have LLVMPATH=~/llvm, if your LLVM is in a different directory, please update
 it accordingly:
 1. If your llvm is installed in your system include directories, e.g.
 /usr/include etc. You can remove the -I option when compiling using g++)
@@ -17,13 +17,13 @@ We used Bison & Flex to generate our parser and the environment is Mac OS X.
 To generate the parser, simply run 'make' or 'make parser'.
 
 To use the parser to parse your source file, run:
-./parser source-file [ -o1 outputfile1] [-emit-ast] [-o2 outputfile2]
+./parser source-file [ -o outputfile] [-emit-ast] [-O] [-jit]
 
-When -o1 option is used, the AST will be output to 'outputfile1' in YAML format.
-When only -emit-ast option is used, AST will be printed to standard output.
-If not options specified, the parser will silently parse the source and check
-any syntax errors, and won't print the output.
-When -o2 option is used, the CodeGen will be output to 'outputfile2'.
+-o outputfile: when '-o' is specified, it must be followed by an output
+               file name.
+-O           : when '-O' is specified, LLVM generated IR code will be
+               optimized.
+-jit         : when '-jit' is specified, the compiler JIT compiles the code.
 
 Run "make clean" to clean up the intermediate files generated.
 

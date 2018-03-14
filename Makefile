@@ -1,15 +1,5 @@
 all: parser
 
-# OBJS = parser.o  \
-#        codegen.o \
-#        main.o    \
-#        tokens.o  \
-#        corefn.o  \
-# 	   native.o  \
-# LLVMCONFIG = llvm-config
-# CPPFLAGS = `$(LLVMCONFIG) --cppflags` -std=c++11
-# LDFLAGS = `$(LLVMCONFIG) --ldflags` -lpthread -ldl -lz -lncurses -rdynamic
-
 OBJS = parser.o  \
        tokens.o  \
        codegen.o \
@@ -18,6 +8,7 @@ OBJS = parser.o  \
        corefn.o
 
 LLVMPATH=~/llvm
+LLVMBIN=$(LLVMPATH)/bin
 LLVMCONFIG =$(LLVMPATH)/bin/llvm-config
 
 CPPFLAGS=-std=c++11 -g -Wno-deprecated-register `$(LLVMCONFIG) --cppflags`
@@ -40,7 +31,7 @@ tokens.cpp: tokens.l parser.hpp
 	g++ -c -o $@ $< $(LDFLAGS) $(CPPFLAGS) $(INCLUDES) $(CPPFLAGS)
 
 parser: $(OBJS)
-	g++ -o $@ $(OBJS) $(LIBS) $(LDFLAGS) $(CPPFLAGS) $(INCLUDES)
+	$(LLVMBIN)/clang++ -o $@ $(OBJS) $(LIBS) $(LDFLAGS) $(CPPFLAGS) $(INCLUDES)
 
 test: parser test1.ek
 	./parser test1.ek -emit-ast
