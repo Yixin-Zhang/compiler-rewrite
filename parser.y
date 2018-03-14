@@ -15,6 +15,7 @@
   
   unordered_map<string, string> globid_type;  //record the return type of each function
   unordered_map<string, string> var_type;  //record the type of each variable
+  // unordered_map<string, NVariable*> varname_var;
 
   void yyerror(const char *s) {
     fprintf(stderr, "Error | Line: %d, Column: %d: %s\n", yylineno, yycolumn, s);
@@ -123,7 +124,7 @@ funcs:
 
 func:
     DEFSYM type globid LP opt_vdecls RP blk {
-      var_type.clear();
+      //var_type.clear();
       globid_type[$3->name] = *$2;
       $$ = new NFunctionDeclaration(*$2, $3, $5, $7);
     }
@@ -140,7 +141,10 @@ vdecls:
       ;
 
 vdecl:
-      type var { var_type[$2->name->name] = *$1; $$ = new NVariableDeclaration(*$1, $2); }
+      type var {
+        var_type[$2->name->name] = *$1; $2->exp_type = *$1; $$ = new NVariableDeclaration(*$1, $2);
+        // varname_var[$2->name->name] = $2;
+      }
       ;
 
 opt_tdecls:
@@ -212,7 +216,7 @@ binop:
      | exp GTR exp { $$ = new NBinaryOperator($1, OP_GTR, $3, type_inference($1)); }
      | exp AND exp { $$ = new NBinaryOperator($1, OP_AND, $3, type_inference($1)); }
      | exp OR exp { $$ = new NBinaryOperator($1, OP_OR, $3, type_inference($1)); }
-     | exp ASSIGN exp { $$ = new NBinaryOperator($1, OP_ASSIGN, $3, type_inference($1)); }
+     | var ASSIGN exp { $$ = new NBinaryOperator($1, OP_ASSIGN, $3, type_inference($1)); }
      ;
 
 uop:
@@ -230,11 +234,13 @@ slit:
     ;
 
 var:
-    DOLLOR ident { string s_temp = var_type[$2->name];
+    DOLLOR ident {
+      string s_temp = var_type[$2->name];
       auto found = s_temp.find("ref ");
       if (found != string::npos)
         s_temp = s_temp.substr(found+4);
-      $$ = new NVariable($2, s_temp); }
+      $$ = new NVariable($2, s_temp);
+    }
    ;
 
 ident:

@@ -29,10 +29,10 @@ void CodeGenContext::generateCode(NProgram& root) {
     /* Print the bytecode in a human-readable format
      to see if our program compiled properly
      */
-    std::cout << "Code is generated.\n";
+     std::cout << "Code is generated.\n";
     // module->dump();
 
-    if (getOpt()) {
+     if (getOpt()) {
         std::cout << "Running optimization...\n";
         // legacy::PassManager pm;
         // pm.add(createPrintModulePass(outs()));
@@ -129,8 +129,9 @@ Value* NVariable::codeGen(CodeGenContext& context) {
     return name->codeGen(context);
 }
 
-Value* NAssignment_codeGen(CodeGenContext& context, NExpression *hs, NExpression *rhs) {
+Value* NAssignment_codeGen(CodeGenContext& context, NVariable *hs, NExpression *rhs) {
     std::cout << "Creating assignment... " << endl;
+    cout << "type: lhs=" << hs->exp_type << ", rhs=" << rhs->exp_type << endl;
     NVariable *lhs = (NVariable *)hs;
     if (context.locals().find(lhs->name->name) == context.locals().end()) {
         std::cerr << "undeclared variable " << lhs->name->name << endl;
@@ -140,6 +141,7 @@ Value* NAssignment_codeGen(CodeGenContext& context, NExpression *hs, NExpression
     Value *assign_rhs;
     
     //deal with type conversion
+    // cout << "type: lhs=" << lhs->exp_type << ", rhs=" << rhs->exp_type << endl;
     if (lhs->exp_type.find("float") != string::npos) {
         if (rhs->exp_type.find("float") != string::npos)
             assign_rhs = assign_gen;
@@ -169,7 +171,7 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context) {
     switch (op) {
         case OP_AND: instr = Instruction::And; return BinaryOperator::Create(instr, lhs->codeGen(context), rhs->codeGen(context), "", context.currentBlock());
         case OP_OR: instr = Instruction::Or; return BinaryOperator::Create(instr, lhs->codeGen(context), rhs->codeGen(context), "", context.currentBlock());
-        case OP_ASSIGN: return NAssignment_codeGen(context, lhs, rhs);
+        case OP_ASSIGN: return NAssignment_codeGen(context, (NVariable*)lhs, rhs);
     }
     
     Value *clhs = lhs->codeGen(context);
@@ -262,35 +264,35 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context) {
     }
     return NULL;
     
-fmath:
-{
+    fmath:
+    {
     //deal with fast math for float type
-    BinaryOperator *v = BinaryOperator::Create(instr, llhs,
-                                  rrhs, "", context.currentBlock());
-    FastMathFlags FMF;
-    FMF.setUnsafeAlgebra();
-    v->setFastMathFlags(FMF);
-    return v;
-}
+        BinaryOperator *v = BinaryOperator::Create(instr, llhs,
+          rrhs, "", context.currentBlock());
+        FastMathFlags FMF;
+        FMF.setUnsafeAlgebra();
+        v->setFastMathFlags(FMF);
+        return v;
+    }
     
-math:
+    math:
     return BinaryOperator::Create(instr, llhs,
-                                  rrhs, "", context.currentBlock());
+      rrhs, "", context.currentBlock());
     
-fcmp:
-{
+    fcmp:
+    {
     //deal with fast math for float type
-    CmpInst *v = CmpInst::Create(other_instr, pre, llhs,
-                                     rrhs, "", context.currentBlock());
-    FastMathFlags FMF;
-    FMF.setUnsafeAlgebra();
-    v->setFastMathFlags(FMF);
-    return v;
-}
+        CmpInst *v = CmpInst::Create(other_instr, pre, llhs,
+         rrhs, "", context.currentBlock());
+        FastMathFlags FMF;
+        FMF.setUnsafeAlgebra();
+        v->setFastMathFlags(FMF);
+        return v;
+    }
     
-cmp:
+    cmp:
     return CmpInst::Create(other_instr, pre, llhs,
-                                  rrhs, "", context.currentBlock());
+      rrhs, "", context.currentBlock());
 }
 
 Value* NUnaryOperator::codeGen(CodeGenContext& context) {
@@ -415,60 +417,56 @@ Value* NVariableDeclaration::codeGen(CodeGenContext& context) {
 }
 
 Value* NIfStatement::codeGen(CodeGenContext& context) {
-    /*Value *CondV = exp->codeGen(context);
-    if (!CondV) return nullptr;
-    
-    CondV = CmpInst::Create(Instruction::ICmp, CmpInst::ICMP_NE, CondV,
-                                    Builder.getInt1(0), "ifcond", context.currentBlock());
-    //Builder.CreateICmpNE(CondV, Builder.getInt1(0), "ifcond", context.currentBlock());
-    //return CondV1;
-    Function *TheFunction = context.currentBlock()->getParent();
-    
-    return TheFunction;
+    Value *CondV = exp->codeGen(context);
+    if (!CondV)
+       return nullptr;
+
+    // Convert condition to a bool by comparing non-equal to 0.0.
+    CondV = Builder.CreateFCmpONE(CondV, ConstantFP::get(MyContext, APFloat(0.0)), "ifcond");
+
+    Function *TheFunction = Builder.GetInsertBlock()->getParent();
+
     // Create blocks for the then and else cases.  Insert the 'then' block at the
     // end of the function.
-    //BasicBlock *ThenBB = BasicBlock::Create(MyContext, "then", TheFunction);
-    BasicBlock *ThenBB = BasicBlock::Create(MyContext, "then", TheFunction);
+    BasicBlock *ThenBB =
+    BasicBlock::Create(MyContext, "then", TheFunction);
     BasicBlock *ElseBB = BasicBlock::Create(MyContext, "else");
-    BasicBlock *MergeBB = BasicBlock::Create(MyContext, "ifcon");
-    
+    BasicBlock *MergeBB = BasicBlock::Create(MyContext, "ifcont");
+
     Builder.CreateCondBr(CondV, ThenBB, ElseBB);
-    
+
     // Emit then value.
     Builder.SetInsertPoint(ThenBB);
-    
+
     Value *ThenV = stmt->codeGen(context);
-    
+    if (!ThenV)
+      return nullptr;
+
     Builder.CreateBr(MergeBB);
-    // codeGen of 'Then' can change the current block, update ThenBB for the PHI.
+    // Codegen of 'Then' can change the current block, update ThenBB for the PHI.
     ThenBB = Builder.GetInsertBlock();
-    
+
     // Emit else block.
     TheFunction->getBasicBlockList().push_back(ElseBB);
     Builder.SetInsertPoint(ElseBB);
-    
-    Value *ElseV = NULL;
-    if (else_stmt != nullptr) {
-        ElseV = else_stmt->codeGen(context);
-    }
-    
+
+    Value *ElseV = else_stmt->codeGen(context);
+    if (!ElseV)
+      return nullptr;
+
     Builder.CreateBr(MergeBB);
-    // codeGen of 'Else' can change the current block, update ElseBB for the PHI.
+    // codegen of 'Else' can change the current block, update ElseBB for the PHI.
     ElseBB = Builder.GetInsertBlock();
-    
+
     // Emit merge block.
     TheFunction->getBasicBlockList().push_back(MergeBB);
     Builder.SetInsertPoint(MergeBB);
-    
-    //PHINode *PN = PHINode::Create(Type::getInt32Ty(MyContext), 2, "", context.currentBlock());
-    
-    //PN->addIncoming(ThenV, ThenBB);
-    //PN->addIncoming(ElseV, ElseBB);
+    PHINode *PN =
+    Builder.CreatePHI(Type::getDoubleTy(MyContext), 2, "iftmp");
+
+    PN->addIncoming(ThenV, ThenBB);
+    PN->addIncoming(ElseV, ElseBB);
     return PN;
-    
-    return CondV;*/
-    
-    return NULL;
 }
 
 Value* NWhileStatement::codeGen(CodeGenContext& context) {

@@ -1,0 +1,13 @@
+def int fib(int $n1, int $n2, int $n3) {
+	return $n1 + $n2 + $n3;
+}
+
+def int run() {
+	int $a = 10;
+	int $b = 5;
+	int $c = -1;
+  int $val = fib($a, $b, $c);
+  print "My code yields result: ";
+  print $val;
+	return 0;
+}
