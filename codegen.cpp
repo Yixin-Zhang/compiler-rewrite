@@ -250,32 +250,66 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context) {
                 case OP_DIV: return Builder.CreateSDiv(llhs, rrhs, "");
             }
         }  else if (exp_type == "cint") {
-            std::string op_symbol;
-            switch (op) {
-                case OP_PLUS: op_symbol += "sadd"; goto cmath;
-                case OP_MINUS: op_symbol += "ssub"; goto cmath;
-                case OP_TIMES: op_symbol += "smul"; goto cmath;
-                case OP_DIV: instr = Instruction::SDiv; goto cmath;
+            if (op == OP_DIV) {
+                /*//create b == 0
+                NInteger *zero = new NInteger(string("0"), "int");
+                NBinaryOperator *cond1 = new NBinaryOperator(rhs, OP_EQL, zero, "int");
+                
+                //create  print "Divided by 0!"; c = INT_MAX;
+                NPrintSlitStatement *printThen1 = new NPrintSlitStatement("Divided by 0!");
+                
+                
+                //create b == -1 && a == INT_MIN
+                NInteger *neg_one = new NInteger(string("-1"), "int");*/
+                return Builder.CreateSDiv(llhs, rrhs, "");
+            } else {
+                Value *F;
+                string error_info;
+                switch (op) {
+                    case OP_PLUS: {
+                        F = Intrinsic::getDeclaration(context.module, Intrinsic::sadd_with_overflow, Type::getInt32Ty(MyContext));
+                        error_info = ",Add operation overflows!,";
+                        break;
+                    }
+                    case OP_MINUS: {
+                        F = Intrinsic::getDeclaration(context.module, Intrinsic::ssub_with_overflow, Type::getInt32Ty(MyContext));
+                        error_info = ",Sub operation overflows!,";
+                        break;
+                    }
+                    case OP_TIMES: {
+                        F = Intrinsic::getDeclaration(context.module, Intrinsic::smul_with_overflow, Type::getInt32Ty(MyContext));
+                        error_info = ",Mul operation overflows!,";
+                        break;
+                    }
+                }
+                auto *SBinaryOperatorWithOverflow = Builder.CreateCall(F, {llhs, rrhs}, "t");
+                auto *SBinaryOperator = Builder.CreateExtractValue(SBinaryOperatorWithOverflow, 0, "binaryop");
+                auto *Overflow = Builder.CreateExtractValue(SBinaryOperatorWithOverflow, 1, "obit");
+                
+                Function *TheFunction = context.currentBlock()->getParent();
+                BasicBlock *NormalBB = BasicBlock::Create(MyContext, "normal", TheFunction);
+                BasicBlock *OverflowBB = BasicBlock::Create(MyContext, "overflow");
+                BasicBlock *MergeBB = BasicBlock::Create(MyContext, "continue");
+                
+                Builder.CreateCondBr(Overflow, NormalBB, OverflowBB);
+                
+                Builder.SetInsertPoint(NormalBB);
+                Builder.CreateBr(MergeBB);
+                
+                TheFunction->getBasicBlockList().push_back(OverflowBB);
+                Builder.SetInsertPoint(OverflowBB);
+                auto printError = new NPrintSlitStatement(error_info);
+                printError->codeGen(context);
+                Builder.CreateBr(MergeBB);
+                
+                TheFunction->getBasicBlockList().push_back(MergeBB);
+                Builder.SetInsertPoint(MergeBB);
+                
+                return SBinaryOperator;
             }
-            //we should add some error reporting code here if overflow happens
         }
     }
     return NULL;
-cmath:
-    {
-        Module *M = context.module;
-        Value *F = Intrinsic::getDeclaration(M, Intrinsic::sadd_with_overflow, Type::getInt32Ty(MyContext));
-        auto *SAddWithOverflow = CallInst::Create(F, {llhs, rrhs}, "t", context.currentBlock());
-        auto *UAdd = ExtractValueInst::Create(SAddWithOverflow, 0, "sum", context.currentBlock());
-        auto *Overflow = ExtractValueInst::Create(SAddWithOverflow, 1, "obit", context.currentBlock());
-        BasicBlock *ThenBB = BasicBlock::Create(MyContext, "sum");
-        BasicBlock *ElseBB = BasicBlock::Create(MyContext, "obit");
-        BasicBlock *MergeBB = BasicBlock::Create(MyContext, "ifcon");
-        
-        Builder.CreateCondBr(Overflow, ThenBB, ElseBB);
-        //auto ConBr = (Type::getInt32Ty(MyContext), Instruction::Br, );
-        return SAddWithOverflow;
-    }
 }
 
 Value* NUnaryOperator::codeGen(CodeGenContext& context) {
