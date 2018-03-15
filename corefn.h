@@ -1,5 +1,4 @@
 #include <iostream>
-#include "codegen.h"
 #include "node.h"
 
 using namespace std;
@@ -9,3 +8,4 @@ extern NProgram* programBlock;
 
 llvm::Function* createPrintfFunction(CodeGenContext& context);
 void createCoreFunctions(CodeGenContext& context);
+void InitializeFunctionPassManager(CodeGenContext& context);

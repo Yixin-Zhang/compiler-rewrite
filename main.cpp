@@ -1,5 +1,6 @@
 #include <iostream>
 #include "codegen.h"
+#include "corefn.h"
 #include "node.h"
 
 using namespace std;
@@ -10,12 +11,14 @@ extern NProgram* programBlock;
 
 void createCoreFunctions(CodeGenContext& context);
 
+
 int main(int argc, char **argv) {
  	// By default DO NOT print AST tree to stdout uness -emit-ast is provided.
 	bool emit_ast = false;
 	// Only support -O3 optimization level.
 	bool opt = false;
 	bool jit = false;
+	bool verbose = false;
 	string inputfile, outputfile, outputfile_codegen;
 	for (int i = 1; i < argc; ++i) {
 		if (string(argv[i]).compare(string("-emit-ast")) == 0) {
@@ -37,6 +40,10 @@ int main(int argc, char **argv) {
 		}
 		if (string(argv[i]).compare(string("-jit")) == 0) {
 			jit = true;
+			continue;
+		}
+		if (string(argv[i]).compare(string("-v")) == 0) {
+			verbose = true;
 			continue;
 		}
 		if (!inputfile.empty()) {
@@ -97,8 +104,10 @@ int main(int argc, char **argv) {
 	context.setOpt(opt);
 	context.setJit(jit);
 	createCoreFunctions(context);
-	context.generateCode(*programBlock);	
-	context.printGenCode();
+	InitializeFunctionPassManager(context);  // Initialize the Optimizer
+	context.generateCode(*programBlock);
+	if (verbose)
+		context.printGenCode();
     if (!outputfile_codegen.empty()) {
         cout << "Writing generated code to outputfile: " << outputfile_codegen << endl;
         if (programBlock != NULL) {
@@ -111,7 +120,8 @@ int main(int argc, char **argv) {
             ofs << os;
         }
     }
-	//context.runCode();
+
+	context.runCode();
 
 	cout << "Done." << endl;
 	return 0;

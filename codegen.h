@@ -13,6 +13,7 @@
 #include <llvm/IR/CallingConv.h>
 #include <llvm/IR/IRPrintingPasses.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Verifier.h>
 #include <llvm/Bitcode/BitstreamReader.h>
 #include <llvm/Bitcode/BitstreamWriter.h>
 #include <llvm/Support/TargetSelect.h>
@@ -24,6 +25,8 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
+#include <llvm/Transforms/Scalar.h>
+#include <llvm/Transforms/Scalar/GVN.h>
 
 #include "node.h"
 #include "parser.hpp"
@@ -35,13 +38,6 @@ static IRBuilder<> Builder(MyContext);
 
 // static std::unique_ptr<Module> TheModule;
 // static std::map<std::string, Value *> NamedValues;
-
-/*
-Value *LogErrorV(const char *Str) {
-  LogError(Str);
-  return nullptr;
-}
-*/
 
 class CodeGenBlock {
 public:
@@ -59,9 +55,10 @@ class CodeGenContext {
 
 public:
     Module *module;
-    
+    std::unique_ptr<legacy::FunctionPassManager> TheFPM;
     CodeGenContext() {
-        module = new Module("main", MyContext);
+        module = new Module("My cool compiler", MyContext);
+        TheFPM = nullptr;
         opt = false;
         jit = false;
     }

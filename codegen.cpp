@@ -28,6 +28,7 @@ void CodeGenContext::generateCode(NProgram& root) {
     std::cout << "Code is generated.\n";
     // module->dump();
 
+    /*
     if (getOpt()) {
         std::cout << "Running optimization...\n";
         // legacy::PassManager pm;
@@ -48,6 +49,7 @@ void CodeGenContext::generateCode(NProgram& root) {
         pm->run(*module);
         delete pm;
     }
+    */
 }
 
 /* Executes the AST by running the main function */
@@ -61,7 +63,6 @@ GenericValue CodeGenContext::runCode() {
     std::string err;
     EngineBuilder* eb = new EngineBuilder(unique_ptr<Module>(module));
     if (getJit()) {
-
         eb->setEngineKind(llvm::EngineKind::JIT).setErrorStr(&err);
     }
     ExecutionEngine *ee = eb->create();
@@ -408,9 +409,21 @@ Value* NFunctionDeclaration::codeGen(CodeGenContext& context) {
 
     block->codeGen(context);
     Builder.CreateRet(context.getCurrentReturnValue());
-    
+
+    // Validate the generated code, checking for consistency.
+    verifyFunction(*function);
+
+    if (context.getOpt()) {
+        // Run the optimizer on the function.
+        if (context.TheFPM != nullptr) {
+            std::cout << "Optimizing function: " << globid->name << endl;
+            context.TheFPM->run(*function);
+        }
+    }
+
     context.popBlock();
     std::cout << "Created function: " << globid->name << endl;
+
     return function;
 }
 
