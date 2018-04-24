@@ -1,6 +1,7 @@
 Members:
- - Weixiang Weng
  - Yixin Zhang
+ - Weixiang Weng
+
 
 *****************************************************************************
 NOTE: We put our llvm source code under user home directory (in Makefile we
@@ -27,8 +28,3 @@ To use the parser to parse your source file, run:
 
 Run "make clean" to clean up the intermediate files generated.
 
-We tried our best to make a complete compiler, however, for this assignment, we
-still didn't finish 3 things:
-1. If statement
-2. While statement
-3. Things related to noalias
